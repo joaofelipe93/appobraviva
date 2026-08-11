@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatarCpf } from "@/lib/obras.schemas";
 import { criarObra, listarMinhasObras, meuPerfil, registrarPerfil } from "@/lib/obras.functions";
 import { criarObraSchema, progressoDasEtapas } from "@/lib/obras.schemas";
 import type { z } from "zod";
@@ -140,6 +141,7 @@ function Onboarding() {
   const queryClient = useQueryClient();
   const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
   const [nome, setNome] = useState("");
+  const [cpf, setCpf] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   async function salvar(evento: React.FormEvent) {
@@ -152,6 +154,7 @@ function Onboarding() {
         data: {
           nome: nome.trim() || String(metadados["nome"] ?? "").trim() || "Usuário",
           papel: (metadados["papel"] as "engenheiro" | "cliente" | undefined) ?? papel,
+          cpf: cpf || String(metadados["cpf"] ?? ""),
         },
       });
       await queryClient.invalidateQueries();
@@ -180,6 +183,17 @@ function Onboarding() {
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
                 maxLength={120}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="cpf-perfil">CPF</Label>
+              <Input
+                id="cpf-perfil"
+                value={cpf}
+                onChange={(e) => setCpf(formatarCpf(e.target.value))}
+                inputMode="numeric"
+                placeholder="000.000.000-00"
                 required
               />
             </div>

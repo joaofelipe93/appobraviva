@@ -326,12 +326,12 @@ function Clientes({
   onChange,
 }: {
   obraId: string;
-  clientes: { id: string; nome: string; email: string }[];
+  clientes: { id: string; nome: string; email: string; cpf: string | null }[];
   onChange: () => Promise<void>;
 }) {
   const vincular = useServerFn(vincularCliente);
   const desvincular = useServerFn(desvincularCliente);
-  const [email, setEmail] = useState("");
+  const [cpf, setCpf] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   return (
@@ -348,7 +348,9 @@ function Clientes({
         >
           <div>
             <p className="font-semibold">{cliente.nome || "Cliente"}</p>
-            <p className="text-xs text-muted-foreground">{cliente.email}</p>
+            <p className="text-xs text-muted-foreground">
+              {cliente.cpf ? formatarCpf(cliente.cpf) : cliente.email}
+            </p>
           </div>
           <Button
             variant="ghost"
@@ -371,8 +373,8 @@ function Clientes({
           evento.preventDefault();
           setEnviando(true);
           try {
-            const resultado = await vincular({ data: { obraId, email: email.trim() } });
-            setEmail("");
+            const resultado = await vincular({ data: { obraId, cpf } });
+            setCpf("");
             await onChange();
             toast.success(`${resultado.nome || "Cliente"} vinculado à obra.`);
           } catch (erro) {
@@ -384,13 +386,14 @@ function Clientes({
           }
         }}
       >
-        <Label htmlFor="email-cliente">E-mail do cliente</Label>
+        <Label htmlFor="cpf-cliente">CPF do cliente</Label>
         <div className="flex gap-2">
           <Input
-            id="email-cliente"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            id="cpf-cliente"
+            inputMode="numeric"
+            placeholder="000.000.000-00"
+            value={cpf}
+            onChange={(e) => setCpf(formatarCpf(e.target.value))}
             required
             className="rounded-sm"
           />
