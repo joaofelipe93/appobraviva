@@ -23,7 +23,7 @@ import {
 } from "@/lib/obras.functions";
 import { COLUNAS_EXCEL_PADRAO } from "@/lib/obras.schemas";
 
-export const Route = createFileRoute("/_authenticated/obras/$id/nova-atualizacao")({
+export const Route = createFileRoute("/_authenticated/obras_/$id/nova-atualizacao")({
   head: () => ({
     meta: [
       { title: "Nova atualização da obra — ObraViva" },
