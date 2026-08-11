@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -64,6 +64,8 @@ function Painel() {
   }
 
   if (!perfil.data?.papel) return <Onboarding />;
+
+  if (perfil.data.papel === "admin") return <Navigate to="/admin" replace />;
 
   const engenheiro = perfil.data.papel === "engenheiro";
 
@@ -139,7 +141,6 @@ function Painel() {
 function Onboarding() {
   const registrar = useServerFn(registrarPerfil);
   const queryClient = useQueryClient();
-  const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -153,7 +154,7 @@ function Onboarding() {
       await registrar({
         data: {
           nome: nome.trim() || String(metadados["nome"] ?? "").trim() || "Usuário",
-          papel: (metadados["papel"] as "engenheiro" | "cliente" | undefined) ?? papel,
+          papel: (metadados["papel"] as "engenheiro" | "cliente" | undefined) ?? "cliente",
           cpf: cpf || String(metadados["cpf"] ?? ""),
         },
       });
@@ -197,25 +198,10 @@ function Onboarding() {
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label>Eu sou</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["engenheiro", "cliente"] as const).map((opcao) => (
-                  <button
-                    key={opcao}
-                    type="button"
-                    onClick={() => setPapel(opcao)}
-                    className={`rounded-sm border-2 px-3 py-2 text-sm font-semibold uppercase ${
-                      papel === opcao
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-border bg-background text-muted-foreground"
-                    }`}
-                  >
-                    {opcao === "engenheiro" ? "Engenheiro" : "Cliente"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Seu papel (engenheiro ou cliente) é definido pelo administrador no pré-cadastro do
+              seu CPF.
+            </p>
             <Button type="submit" disabled={salvando} className="w-full">
               {salvando ? "Salvando..." : "Salvar e continuar"}
             </Button>

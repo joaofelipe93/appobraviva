@@ -1,9 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { cpfSchema, formatarCpf } from "@/lib/obras.schemas";
+import { verificarLiberacao } from "@/lib/obras.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +42,7 @@ const cadastroSchema = z.object({
 function Login() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
-  const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
+  const verificar = useServerFn(verificarLiberacao);
   const [carregando, setCarregando] = useState(false);
 
   async function enviar(evento: React.FormEvent<HTMLFormElement>) {
@@ -94,12 +96,27 @@ function Login() {
     }
 
     setCarregando(true);
+    const liberacao = await verificar({
+      data: { cpf: parsed.data.cpf, email: parsed.data.email },
+    }).catch(() => ({ liberado: false as const }));
+
+    if (!liberacao.liberado) {
+      setCarregando(false);
+      toast.error("Cadastro não liberado", {
+        description:
+          "jaUsado" in liberacao && liberacao.jaUsado
+            ? "Este pré-cadastro já foi utilizado. Entre com a sua conta ou fale com o administrador."
+            : "Seu CPF e e-mail precisam ser pré-cadastrados pelo administrador antes de criar a conta.",
+      });
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.senha,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { nome: parsed.data.nome, papel, cpf: parsed.data.cpf },
+        data: { nome: parsed.data.nome, papel: liberacao.papel, cpf: parsed.data.cpf },
       },
     });
     setCarregando(false);
@@ -141,22 +158,10 @@ function Login() {
         <form onSubmit={enviar} className="mt-6 space-y-4">
           {modo === "criar" && (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                {(["engenheiro", "cliente"] as const).map((opcao) => (
-                  <button
-                    key={opcao}
-                    type="button"
-                    onClick={() => setPapel(opcao)}
-                    className={`rounded-sm border-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                      papel === opcao
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-border bg-background text-muted-foreground"
-                    }`}
-                  >
-                    {opcao === "engenheiro" ? "Engenheiro" : "Cliente"}
-                  </button>
-                ))}
-              </div>
+              <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                O acesso é liberado pelo administrador. Use o CPF e o e-mail informados no
+                pré-cadastro — seu papel (engenheiro ou cliente) já vem definido.
+              </p>
               <div className="space-y-1.5">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input id="nome" name="nome" required maxLength={120} className="rounded-sm" />

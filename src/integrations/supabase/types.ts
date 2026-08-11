@@ -213,6 +213,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pre_cadastros: {
+        Row: {
+          cpf: string
+          created_at: string
+          criado_por: string | null
+          email: string
+          id: string
+          nome: string
+          papel: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          usado_em: string | null
+          usado_por: string | null
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          criado_por?: string | null
+          email?: string
+          id?: string
+          nome?: string
+          papel: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          criado_por?: string | null
+          email?: string
+          id?: string
+          nome?: string
+          papel?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cpf: string | null
@@ -275,7 +314,7 @@ export type Database = {
       is_obra_engenheiro: { Args: { _obra_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "engenheiro" | "cliente"
+      app_role: "engenheiro" | "cliente" | "admin"
       etapa_status: "nao_iniciada" | "em_andamento" | "concluida"
       midia_tipo: "foto" | "video"
     }
@@ -405,7 +444,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["engenheiro", "cliente"],
+      app_role: ["engenheiro", "cliente", "admin"],
       etapa_status: ["nao_iniciada", "em_andamento", "concluida"],
       midia_tipo: ["foto", "video"],
     },
