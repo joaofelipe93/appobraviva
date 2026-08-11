@@ -32,9 +32,40 @@ export type ExcelDados = {
   aviso?: string;
 };
 
+export function soDigitos(valor: string): string {
+  return (valor ?? "").replace(/\D/g, "");
+}
+
+export function formatarCpf(valor: string): string {
+  const d = soDigitos(valor).slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+}
+
+export function cpfValido(valor: string): boolean {
+  const cpf = soDigitos(valor);
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digito = (tamanho: number) => {
+    let soma = 0;
+    for (let i = 0; i < tamanho; i += 1) soma += Number(cpf[i]) * (tamanho + 1 - i);
+    const resto = (soma * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+  return digito(9) === Number(cpf[9]) && digito(10) === Number(cpf[10]);
+}
+
+export const cpfSchema = z
+  .string()
+  .trim()
+  .transform(soDigitos)
+  .refine(cpfValido, "CPF inválido");
+
 export const perfilSchema = z.object({
   nome: z.string().trim().min(2, "Informe seu nome").max(120),
   papel: z.enum(["engenheiro", "cliente"]),
+  cpf: cpfSchema,
 });
 
 export const criarObraSchema = z.object({
@@ -46,7 +77,7 @@ export const criarObraSchema = z.object({
 
 export const vincularClienteSchema = z.object({
   obraId: z.string().uuid(),
-  email: z.string().trim().email("E-mail inválido").max(255),
+  cpf: cpfSchema,
 });
 
 export const etapaUpdateSchema = z.object({

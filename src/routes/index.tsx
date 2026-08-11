@@ -3,6 +3,7 @@ import { useState } from "react";
 import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { cpfSchema, formatarCpf } from "@/lib/obras.schemas";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ export const Route = createFileRoute("/")({
 
 const cadastroSchema = z.object({
   nome: z.string().trim().min(2, "Informe seu nome completo").max(120),
+  cpf: cpfSchema,
   email: z.string().trim().email("E-mail inválido").max(255),
   senha: z.string().min(8, "A senha deve ter no mínimo 8 caracteres").max(72),
 });
@@ -59,7 +61,12 @@ function Login() {
       return;
     }
 
-    const parsed = cadastroSchema.safeParse({ nome: dados.get("nome"), email, senha });
+    const parsed = cadastroSchema.safeParse({
+      nome: dados.get("nome"),
+      cpf: String(dados.get("cpf") ?? ""),
+      email,
+      senha,
+    });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
       return;
@@ -71,7 +78,7 @@ function Login() {
       password: parsed.data.senha,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { nome: parsed.data.nome, papel },
+        data: { nome: parsed.data.nome, papel, cpf: parsed.data.cpf },
       },
     });
     setCarregando(false);
@@ -130,6 +137,20 @@ function Login() {
               <div className="space-y-1.5">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input id="nome" name="nome" required maxLength={120} className="rounded-sm" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="cpf">CPF</Label>
+                <Input
+                  id="cpf"
+                  name="cpf"
+                  required
+                  onChange={(e) => {
+                    e.currentTarget.value = formatarCpf(e.currentTarget.value);
+                  }}
+                  inputMode="numeric"
+                  placeholder="000.000.000-00"
+                  className="rounded-sm"
+                />
               </div>
             </>
           )}

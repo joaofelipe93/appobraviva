@@ -21,9 +21,18 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const email = (context.claims["email"] as string | undefined) ?? "";
 
-    await supabaseAdmin
+    const { error: perfilErro } = await supabaseAdmin
       .from("profiles")
-      .upsert({ id: context.userId, nome: data.nome, email }, { onConflict: "id" });
+      .upsert(
+        { id: context.userId, nome: data.nome, email, cpf: data.cpf },
+        { onConflict: "id" },
+      );
+    if (perfilErro) {
+      if (perfilErro.code === "23505" || perfilErro.message.includes("duplicate")) {
+        throw new Error("Este CPF já está cadastrado em outra conta.");
+      }
+      throw new Error(perfilErro.message);
+    }
 
     const { data: papeis } = await supabaseAdmin
       .from("user_roles")
@@ -46,7 +55,7 @@ export const meuPerfil = createServerFn({ method: "GET" })
     const [{ data: perfil }, { data: papeis }] = await Promise.all([
       context.supabase
         .from("profiles")
-        .select("nome, email")
+        .select("nome, email, cpf")
         .eq("id", context.userId)
         .maybeSingle(),
       context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
@@ -56,6 +65,7 @@ export const meuPerfil = createServerFn({ method: "GET" })
       userId: context.userId,
       nome: perfil?.nome ?? "",
       email: perfil?.email ?? ((context.claims["email"] as string | undefined) ?? ""),
+      cpf: perfil?.cpf ?? "",
       papel: (papeis?.[0]?.role ?? null) as "engenheiro" | "cliente" | null,
     };
   });
@@ -128,11 +138,11 @@ export const obterObra = createServerFn({ method: "GET" })
       ]);
 
     const clienteIds = (vinculos ?? []).map((v) => v.cliente_id);
-    let clientes: { id: string; nome: string; email: string }[] = [];
+    let clientes: { id: string; nome: string; email: string; cpf: string | null }[] = [];
     if (clienteIds.length > 0) {
       const { data: perfis } = await context.supabase
         .from("profiles")
-        .select("id, nome, email")
+        .select("id, nome, email, cpf")
         .in("id", clienteIds);
       clientes = perfis ?? [];
     }
@@ -227,16 +237,15 @@ export const vincularCliente = createServerFn({ method: "POST" })
     if (!obra) throw new Error("Você não é o engenheiro responsável por esta obra");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const email = data.email.toLowerCase();
     const { data: perfil } = await supabaseAdmin
       .from("profiles")
       .select("id, nome")
-      .ilike("email", email)
+      .eq("cpf", data.cpf)
       .maybeSingle();
 
     if (!perfil) {
       throw new Error(
-        "Nenhuma conta encontrada com este e-mail. Peça ao cliente para se cadastrar primeiro.",
+        "Nenhuma conta encontrada com este CPF. Peça ao cliente para se cadastrar primeiro.",
       );
     }
 
