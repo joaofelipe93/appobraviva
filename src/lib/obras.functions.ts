@@ -21,6 +21,36 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const email = (context.claims["email"] as string | undefined) ?? "";
 
+    const { data: papeis } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+
+    let papel = papeis?.[0]?.role ?? null;
+
+    if (!papel) {
+      const { data: liberacao } = await supabaseAdmin
+        .from("pre_cadastros")
+        .select("id, nome, papel, usado_por")
+        .eq("cpf", data.cpf)
+        .maybeSingle();
+
+      if (!liberacao) {
+        throw new Error(
+          "Este CPF não foi liberado pelo administrador. Solicite o pré-cadastro para acessar.",
+        );
+      }
+      if (liberacao.usado_por && liberacao.usado_por !== context.userId) {
+        throw new Error("Este CPF já está vinculado a outra conta.");
+      }
+      papel = liberacao.papel;
+
+      await supabaseAdmin
+        .from("pre_cadastros")
+        .update({ usado_em: new Date().toISOString(), usado_por: context.userId })
+        .eq("id", liberacao.id);
+    }
+
     const { error: perfilErro } = await supabaseAdmin
       .from("profiles")
       .upsert(
@@ -34,19 +64,88 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       throw new Error(perfilErro.message);
     }
 
-    const { data: papeis } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-
     if (!papeis || papeis.length === 0) {
-      await supabaseAdmin
-        .from("user_roles")
-        .insert({ user_id: context.userId, role: data.papel });
-      return { papel: data.papel };
+      await supabaseAdmin.from("user_roles").insert({ user_id: context.userId, role: papel });
     }
 
-    return { papel: papeis[0]!.role };
+    return { papel };
+  });
+
+export const verificarLiberacao = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        cpf: z.string().trim().transform((v) => v.replace(/\D/g, "")),
+        email: z.string().trim().email().max(255).toLowerCase(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: liberacao } = await supabaseAdmin
+      .from("pre_cadastros")
+      .select("nome, papel, email, usado_por")
+      .eq("cpf", data.cpf)
+      .maybeSingle();
+
+    if (!liberacao || liberacao.email.toLowerCase() !== data.email) {
+      return { liberado: false as const };
+    }
+    if (liberacao.usado_por) {
+      return { liberado: false as const, jaUsado: true as const };
+    }
+    return { liberado: true as const, nome: liberacao.nome, papel: liberacao.papel };
+  });
+
+async function garantirAdmin(context: { supabase: any; userId: string }) {
+  const { data } = await context.supabase.rpc("has_role", {
+    _user_id: context.userId,
+    _role: "admin",
+  });
+  if (!data) throw new Error("Apenas administradores podem acessar esta área.");
+}
+
+export const listarPreCadastros = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await garantirAdmin(context);
+    const { data, error } = await context.supabase
+      .from("pre_cadastros")
+      .select("id, nome, cpf, email, papel, usado_em, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  });
+
+export const criarPreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => preCadastroSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await garantirAdmin(context);
+    const { error } = await context.supabase.from("pre_cadastros").insert({
+      nome: data.nome,
+      cpf: data.cpf,
+      email: data.email,
+      papel: data.papel,
+      criado_por: context.userId,
+    });
+    if (error) {
+      if (error.code === "23505" || error.message.includes("duplicate")) {
+        throw new Error("Já existe um pré-cadastro com este CPF.");
+      }
+      throw new Error(error.message);
+    }
+    return { ok: true };
+  });
+
+export const removerPreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await garantirAdmin(context);
+    const { error } = await context.supabase.from("pre_cadastros").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const meuPerfil = createServerFn({ method: "GET" })
