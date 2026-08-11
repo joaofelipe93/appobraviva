@@ -8,6 +8,7 @@ import {
   midiasSchema,
   novaEtapaSchema,
   perfilSchema,
+  preCadastroSchema,
   vincularClienteSchema,
   ETAPAS_PADRAO,
 } from "./obras.schemas";
