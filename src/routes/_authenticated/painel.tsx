@@ -154,7 +154,7 @@ function Onboarding() {
       await registrar({
         data: {
           nome: nome.trim() || String(metadados["nome"] ?? "").trim() || "Usuário",
-          papel: (metadados["papel"] as "engenheiro" | "cliente" | undefined) ?? papel,
+          papel: (metadados["papel"] as "engenheiro" | "cliente" | undefined) ?? "cliente",
           cpf: cpf || String(metadados["cpf"] ?? ""),
         },
       });
