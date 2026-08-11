@@ -142,7 +142,6 @@ function Onboarding() {
   const registrar = useServerFn(registrarPerfil);
   const queryClient = useQueryClient();
   const [nome, setNome] = useState("");
-  const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [salvando, setSalvando] = useState(false);
 
