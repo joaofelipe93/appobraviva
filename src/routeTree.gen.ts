@@ -10,33 +10,108 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
+import { Route as AuthenticatedAtualizacoesIdRouteImport } from './routes/_authenticated/atualizacoes.$id'
+import { Route as AuthenticatedObrasIdRouteImport } from './routes/_authenticated/obras.$id'
+import { Route as AuthenticatedObrasIdNovaAtualizacaoRouteImport } from './routes/_authenticated/obras.$id.nova-atualizacao'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
+  id: '/painel',
+  path: '/painel',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAtualizacoesIdRoute =
+  AuthenticatedAtualizacoesIdRouteImport.update({
+    id: '/atualizacoes/$id',
+    path: '/atualizacoes/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedObrasIdRoute = AuthenticatedObrasIdRouteImport.update({
+  id: '/obras/$id',
+  path: '/obras/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedObrasIdNovaAtualizacaoRoute =
+  AuthenticatedObrasIdNovaAtualizacaoRouteImport.update({
+    id: '/nova-atualizacao',
+    path: '/nova-atualizacao',
+    getParentRoute: () => AuthenticatedObrasIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
+  '/obras/$id': typeof AuthenticatedObrasIdRouteWithChildren
+  '/obras/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/painel': typeof AuthenticatedPainelRoute
+  '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
+  '/obras/$id': typeof AuthenticatedObrasIdRouteWithChildren
+  '/obras/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/painel': typeof AuthenticatedPainelRoute
+  '/_authenticated/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
+  '/_authenticated/obras/$id': typeof AuthenticatedObrasIdRouteWithChildren
+  '/_authenticated/obras/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/painel'
+    | '/atualizacoes/$id'
+    | '/obras/$id'
+    | '/obras/$id/nova-atualizacao'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/painel'
+    | '/atualizacoes/$id'
+    | '/obras/$id'
+    | '/obras/$id/nova-atualizacao'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/painel'
+    | '/_authenticated/atualizacoes/$id'
+    | '/_authenticated/obras/$id'
+    | '/_authenticated/obras/$id/nova-atualizacao'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,22 +123,83 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/painel': {
+      id: '/_authenticated/painel'
+      path: '/painel'
+      fullPath: '/painel'
+      preLoaderRoute: typeof AuthenticatedPainelRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/atualizacoes/$id': {
+      id: '/_authenticated/atualizacoes/$id'
+      path: '/atualizacoes/$id'
+      fullPath: '/atualizacoes/$id'
+      preLoaderRoute: typeof AuthenticatedAtualizacoesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/obras/$id': {
+      id: '/_authenticated/obras/$id'
+      path: '/obras/$id'
+      fullPath: '/obras/$id'
+      preLoaderRoute: typeof AuthenticatedObrasIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/obras/$id/nova-atualizacao': {
+      id: '/_authenticated/obras/$id/nova-atualizacao'
+      path: '/nova-atualizacao'
+      fullPath: '/obras/$id/nova-atualizacao'
+      preLoaderRoute: typeof AuthenticatedObrasIdNovaAtualizacaoRouteImport
+      parentRoute: typeof AuthenticatedObrasIdRoute
+    }
   }
 }
 
+interface AuthenticatedObrasIdRouteChildren {
+  AuthenticatedObrasIdNovaAtualizacaoRoute: typeof AuthenticatedObrasIdNovaAtualizacaoRoute
+}
+
+const AuthenticatedObrasIdRouteChildren: AuthenticatedObrasIdRouteChildren = {
+  AuthenticatedObrasIdNovaAtualizacaoRoute:
+    AuthenticatedObrasIdNovaAtualizacaoRoute,
+}
+
+const AuthenticatedObrasIdRouteWithChildren =
+  AuthenticatedObrasIdRoute._addFileChildren(AuthenticatedObrasIdRouteChildren)
+
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
+  AuthenticatedAtualizacoesIdRoute: typeof AuthenticatedAtualizacoesIdRoute
+  AuthenticatedObrasIdRoute: typeof AuthenticatedObrasIdRouteWithChildren
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedPainelRoute: AuthenticatedPainelRoute,
+  AuthenticatedAtualizacoesIdRoute: AuthenticatedAtualizacoesIdRoute,
+  AuthenticatedObrasIdRoute: AuthenticatedObrasIdRouteWithChildren,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
