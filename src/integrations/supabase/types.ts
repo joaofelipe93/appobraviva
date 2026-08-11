@@ -213,6 +213,45 @@ export type Database = {
         }
         Relationships: []
       }
+      pre_cadastros: {
+        Row: {
+          cpf: string
+          created_at: string
+          criado_por: string | null
+          email: string
+          id: string
+          nome: string
+          papel: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          usado_em: string | null
+          usado_por: string | null
+        }
+        Insert: {
+          cpf: string
+          created_at?: string
+          criado_por?: string | null
+          email?: string
+          id?: string
+          nome?: string
+          papel: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Update: {
+          cpf?: string
+          created_at?: string
+          criado_por?: string | null
+          email?: string
+          id?: string
+          nome?: string
+          papel?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          usado_em?: string | null
+          usado_por?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           cpf: string | null
