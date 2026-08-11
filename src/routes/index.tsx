@@ -158,22 +158,10 @@ function Login() {
         <form onSubmit={enviar} className="mt-6 space-y-4">
           {modo === "criar" && (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                {(["engenheiro", "cliente"] as const).map((opcao) => (
-                  <button
-                    key={opcao}
-                    type="button"
-                    onClick={() => setPapel(opcao)}
-                    className={`rounded-sm border-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors ${
-                      papel === opcao
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-border bg-background text-muted-foreground"
-                    }`}
-                  >
-                    {opcao === "engenheiro" ? "Engenheiro" : "Cliente"}
-                  </button>
-                ))}
-              </div>
+              <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                O acesso é liberado pelo administrador. Use o CPF e o e-mail informados no
+                pré-cadastro — seu papel (engenheiro ou cliente) já vem definido.
+              </p>
               <div className="space-y-1.5">
                 <Label htmlFor="nome">Nome completo</Label>
                 <Input id="nome" name="nome" required maxLength={120} className="rounded-sm" />
