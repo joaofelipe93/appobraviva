@@ -161,7 +161,7 @@ export const meuPerfil = createServerFn({ method: "GET" })
       nome: perfil?.nome ?? "",
       email: perfil?.email ?? ((context.claims["email"] as string | undefined) ?? ""),
       cpf: perfil?.cpf ?? "",
-      papel: (papeis?.[0]?.role ?? null) as "engenheiro" | "cliente" | null,
+      papel: (papeis?.[0]?.role ?? null) as "engenheiro" | "cliente" | "admin" | null,
     };
   });
 
