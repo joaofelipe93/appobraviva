@@ -68,6 +68,13 @@ export const perfilSchema = z.object({
   cpf: cpfSchema,
 });
 
+export const preCadastroSchema = z.object({
+  nome: z.string().trim().min(2, "Informe o nome").max(120),
+  cpf: cpfSchema,
+  email: z.string().trim().email("E-mail inválido").max(255).toLowerCase(),
+  papel: z.enum(["engenheiro", "cliente"]),
+});
+
 export const criarObraSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome da obra").max(140),
   endereco: z.string().trim().max(240).default(""),
