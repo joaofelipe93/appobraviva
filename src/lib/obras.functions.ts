@@ -98,18 +98,11 @@ export const verificarLiberacao = createServerFn({ method: "POST" })
     return { liberado: true as const, nome: liberacao.nome, papel: liberacao.papel };
   });
 
-async function garantirAdmin(context: { supabase: any; userId: string }) {
-  const { data } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (!data) throw new Error("Apenas administradores podem acessar esta área.");
-}
-
 export const listarPreCadastros = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await garantirAdmin(context);
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
     const { data, error } = await context.supabase
       .from("pre_cadastros")
       .select("id, nome, cpf, email, papel, usado_em, created_at")
@@ -122,7 +115,8 @@ export const criarPreCadastro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => preCadastroSchema.parse(input))
   .handler(async ({ data, context }) => {
-    await garantirAdmin(context);
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.from("pre_cadastros").insert({
       nome: data.nome,
       cpf: data.cpf,
@@ -143,7 +137,8 @@ export const removerPreCadastro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    await garantirAdmin(context);
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
     const { error } = await context.supabase.from("pre_cadastros").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
