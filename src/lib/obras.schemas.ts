@@ -77,7 +77,7 @@ export const criarObraSchema = z.object({
 
 export const vincularClienteSchema = z.object({
   obraId: z.string().uuid(),
-  email: z.string().trim().email("E-mail inválido").max(255),
+  cpf: cpfSchema,
 });
 
 export const etapaUpdateSchema = z.object({
