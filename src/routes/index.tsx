@@ -3,6 +3,7 @@ import { useState } from "react";
 import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { cpfSchema, formatarCpf } from "@/lib/obras.schemas";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -27,7 +27,12 @@ import {
   salvarEtapa,
   vincularCliente,
 } from "@/lib/obras.functions";
-import { STATUS_LABEL, progressoDasEtapas, type EtapaStatus } from "@/lib/obras.schemas";
+import {
+  STATUS_LABEL,
+  formatarCpf,
+  progressoDasEtapas,
+  type EtapaStatus,
+} from "@/lib/obras.schemas";
 
 export const Route = createFileRoute("/_authenticated/obras/$id")({
   head: () => ({
