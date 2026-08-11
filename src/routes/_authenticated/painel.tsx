@@ -65,6 +65,8 @@ function Painel() {
 
   if (!perfil.data?.papel) return <Onboarding />;
 
+  if (perfil.data.papel === "admin") return <Navigate to="/admin" replace />;
+
   const engenheiro = perfil.data.papel === "engenheiro";
 
   return (
