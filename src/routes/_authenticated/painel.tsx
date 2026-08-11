@@ -141,7 +141,7 @@ function Painel() {
 function Onboarding() {
   const registrar = useServerFn(registrarPerfil);
   const queryClient = useQueryClient();
-  const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
+  const [nome, setNome] = useState("");
   const [nome, setNome] = useState("");
   const [cpf, setCpf] = useState("");
   const [salvando, setSalvando] = useState(false);
