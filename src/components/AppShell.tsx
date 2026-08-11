@@ -19,7 +19,7 @@ export function AppShell({
 
   async function sair() {
     await supabase.auth.signOut();
-    await router.navigate({ to: "/auth" });
+    await router.navigate({ to: "/" });
   }
 
   return (
