@@ -144,6 +144,9 @@ function Login() {
                   id="cpf"
                   name="cpf"
                   required
+                  onChange={(e) => {
+                    e.currentTarget.value = formatarCpf(e.currentTarget.value);
+                  }}
                   inputMode="numeric"
                   placeholder="000.000.000-00"
                   className="rounded-sm"
