@@ -299,19 +299,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      can_view_atualizacao: {
-        Args: { _atualizacao_id: string }
-        Returns: boolean
-      }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
-      is_obra_cliente: { Args: { _obra_id: string }; Returns: boolean }
-      is_obra_engenheiro: { Args: { _obra_id: string }; Returns: boolean }
+      [_ in never]: never
     }
     Enums: {
       app_role: "engenheiro" | "cliente" | "admin"
