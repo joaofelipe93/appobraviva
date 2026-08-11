@@ -199,25 +199,10 @@ function Onboarding() {
                 required
               />
             </div>
-            <div className="space-y-1">
-              <Label>Eu sou</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {(["engenheiro", "cliente"] as const).map((opcao) => (
-                  <button
-                    key={opcao}
-                    type="button"
-                    onClick={() => setPapel(opcao)}
-                    className={`rounded-sm border-2 px-3 py-2 text-sm font-semibold uppercase ${
-                      papel === opcao
-                        ? "border-accent bg-accent text-accent-foreground"
-                        : "border-border bg-background text-muted-foreground"
-                    }`}
-                  >
-                    {opcao === "engenheiro" ? "Engenheiro" : "Cliente"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              Seu papel (engenheiro ou cliente) é definido pelo administrador no pré-cadastro do
+              seu CPF.
+            </p>
             <Button type="submit" disabled={salvando} className="w-full">
               {salvando ? "Salvando..." : "Salvar e continuar"}
             </Button>
