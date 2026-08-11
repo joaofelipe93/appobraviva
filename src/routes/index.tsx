@@ -42,7 +42,7 @@ const cadastroSchema = z.object({
 function Login() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
-  const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
+  const verificar = useServerFn(verificarLiberacao);
   const [carregando, setCarregando] = useState(false);
 
   async function enviar(evento: React.FormEvent<HTMLFormElement>) {
