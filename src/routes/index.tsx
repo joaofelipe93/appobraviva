@@ -94,12 +94,27 @@ function Login() {
     }
 
     setCarregando(true);
+    const liberacao = await verificar({
+      data: { cpf: parsed.data.cpf, email: parsed.data.email },
+    }).catch(() => ({ liberado: false as const }));
+
+    if (!liberacao.liberado) {
+      setCarregando(false);
+      toast.error("Cadastro não liberado", {
+        description:
+          "jaUsado" in liberacao && liberacao.jaUsado
+            ? "Este pré-cadastro já foi utilizado. Entre com a sua conta ou fale com o administrador."
+            : "Seu CPF e e-mail precisam ser pré-cadastrados pelo administrador antes de criar a conta.",
+      });
+      return;
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email: parsed.data.email,
       password: parsed.data.senha,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { nome: parsed.data.nome, papel, cpf: parsed.data.cpf },
+        data: { nome: parsed.data.nome, papel: liberacao.papel, cpf: parsed.data.cpf },
       },
     });
     setCarregando(false);
