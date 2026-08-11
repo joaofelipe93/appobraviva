@@ -275,7 +275,7 @@ export type Database = {
       is_obra_engenheiro: { Args: { _obra_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "engenheiro" | "cliente"
+      app_role: "engenheiro" | "cliente" | "admin"
       etapa_status: "nao_iniciada" | "em_andamento" | "concluida"
       midia_tipo: "foto" | "video"
     }
@@ -405,7 +405,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["engenheiro", "cliente"],
+      app_role: ["engenheiro", "cliente", "admin"],
       etapa_status: ["nao_iniciada", "em_andamento", "concluida"],
       midia_tipo: ["foto", "video"],
     },
