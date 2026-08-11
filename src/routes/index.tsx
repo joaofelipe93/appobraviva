@@ -39,7 +39,7 @@ const cadastroSchema = z.object({
 
 function Login() {
   const router = useRouter();
-  const [modo, setModo] = useState<"entrar" | "criar">("entrar");
+  const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const [papel, setPapel] = useState<"engenheiro" | "cliente">("engenheiro");
   const [carregando, setCarregando] = useState(false);
 
@@ -48,6 +48,27 @@ function Login() {
     const dados = new FormData(evento.currentTarget);
     const email = String(dados.get("email") ?? "").trim();
     const senha = String(dados.get("senha") ?? "");
+
+    if (modo === "recuperar") {
+      if (!email) {
+        toast.error("Informe seu e-mail");
+        return;
+      }
+      setCarregando(true);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/redefinir-senha`,
+      });
+      setCarregando(false);
+      if (error) {
+        toast.error("Não foi possível enviar o e-mail", { description: error.message });
+        return;
+      }
+      toast.success("E-mail enviado", {
+        description: "Se existir uma conta com este e-mail, o link de redefinição chegou na caixa de entrada.",
+      });
+      setModo("entrar");
+      return;
+    }
 
     if (modo === "entrar") {
       setCarregando(true);
@@ -112,7 +133,9 @@ function Login() {
         <p className="mt-6 text-sm text-muted-foreground">
           {modo === "entrar"
             ? "Entre para acompanhar o andamento das obras."
-            : "Crie sua conta para começar."}
+            : modo === "criar"
+              ? "Crie sua conta para começar."
+              : "Informe seu e-mail e enviaremos um link para criar uma nova senha."}
         </p>
 
         <form onSubmit={enviar} className="mt-6 space-y-4">
@@ -167,6 +190,7 @@ function Login() {
             />
           </div>
 
+          {modo !== "recuperar" && (
           <div className="space-y-1.5">
             <Label htmlFor="senha">Senha</Label>
             <Input
@@ -179,23 +203,35 @@ function Login() {
               className="rounded-sm"
             />
           </div>
+          )}
 
           <Button type="submit" className="w-full" disabled={carregando}>
             {carregando
               ? "Aguarde..."
               : modo === "entrar"
                 ? "Entrar"
-                : "Criar conta"}
+                : modo === "criar"
+                  ? "Criar conta"
+                  : "Enviar link de redefinição"}
           </Button>
         </form>
 
-        <button
-          type="button"
-          onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
-          className="mt-6 text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-        >
-          {modo === "entrar" ? "Não tenho conta — criar agora" : "Já tenho conta — entrar"}
-        </button>
+        <div className="mt-6 flex flex-col items-start gap-2">
+          <button
+            type="button"
+            onClick={() => setModo(modo === "criar" ? "entrar" : "criar")}
+            className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            {modo === "criar" ? "Já tenho conta — entrar" : "Não tenho conta — criar agora"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setModo(modo === "recuperar" ? "entrar" : "recuperar")}
+            className="text-sm text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            {modo === "recuperar" ? "Voltar ao login" : "Esqueci minha senha"}
+          </button>
+        </div>
       </div>
     </main>
   );
