@@ -51,6 +51,7 @@ function NovaAtualizacao() {
   const criar = useServerFn(criarAtualizacao);
   const registrar = useServerFn(registrarMidias);
   const processar = useServerFn(processarExcel);
+  const gerarResumo = useServerFn(gerarResumoRelatorio);
   const atualizarEtapa = useServerFn(salvarEtapa);
 
   const obra = useQuery({ queryKey: ["obra", id], queryFn: () => obterFn({ data: { obraId: id } }) });
