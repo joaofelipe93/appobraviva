@@ -132,6 +132,18 @@ function NovaAtualizacao() {
         if (error) throw new Error(error.message);
         const dados = await processar({ data: { atualizacaoId, path, nome: excel.name } });
         if (dados.aviso) toast.warning(dados.aviso);
+
+        setProgresso("Gerando resumo com IA...");
+        try {
+          await gerarResumo({ data: { atualizacaoId } });
+        } catch (erro) {
+          toast.warning("Resumo da IA não gerado", {
+            description:
+              erro instanceof Error
+                ? erro.message
+                : "Você pode gerar o resumo na tela da atualização.",
+          });
+        }
       }
 
       if (concluidas.length > 0) {
