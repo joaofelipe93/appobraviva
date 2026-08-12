@@ -150,8 +150,13 @@ function AtualizacaoPage() {
           <Card className="rounded-sm border-l-4 border-l-accent bg-secondary/40">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-display uppercase">
-                <Sparkles className="h-4 w-4 text-accent" /> Resumo da IA
+                <UserRound className="h-4 w-4 text-accent" /> Resumo do relatório
               </CardTitle>
+              {dados.responsavelNome && (
+                <p className="text-xs text-muted-foreground">
+                  Responsável técnico: {dados.responsavelNome}
+                </p>
+              )}
             </CardHeader>
             <CardContent className="space-y-3">
               {dados.resumo_ia ? (
