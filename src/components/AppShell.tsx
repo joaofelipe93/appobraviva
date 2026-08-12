@@ -16,10 +16,13 @@ export function AppShell({
   acao?: ReactNode;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   async function sair() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await supabase.auth.signOut();
-    await router.navigate({ to: "/" });
+    await router.navigate({ to: "/", replace: true });
   }
 
   return (
