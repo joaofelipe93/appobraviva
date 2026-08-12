@@ -39,6 +39,17 @@ const cadastroSchema = z.object({
   senha: z.string().min(8, "A senha deve ter no mínimo 8 caracteres").max(72),
 });
 
+function mensagemDeErro(mensagem: string): string {
+  const m = mensagem.toLowerCase();
+  if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
+  if (m.includes("email not confirmed")) return "Confirme o e-mail que enviamos antes de entrar.";
+  if (m.includes("already registered")) return "Já existe uma conta com este e-mail.";
+  if (m.includes("pwned") || m.includes("weak")) return "Escolha uma senha mais forte e menos comum.";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+  return mensagem;
+}
+
 function Login() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
@@ -62,7 +73,7 @@ function Login() {
       });
       setCarregando(false);
       if (error) {
-        toast.error("Não foi possível enviar o e-mail", { description: error.message });
+        toast.error("Não foi possível enviar o e-mail", { description: mensagemDeErro(error.message) });
         return;
       }
       toast.success("E-mail enviado", {
@@ -77,7 +88,7 @@ function Login() {
       const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
       setCarregando(false);
       if (error) {
-        toast.error("Não foi possível entrar", { description: error.message });
+        toast.error("Não foi possível entrar", { description: mensagemDeErro(error.message) });
         return;
       }
       await router.navigate({ to: "/painel" });
@@ -122,7 +133,7 @@ function Login() {
     setCarregando(false);
 
     if (error) {
-      toast.error("Não foi possível criar a conta", { description: error.message });
+      toast.error("Não foi possível criar a conta", { description: mensagemDeErro(error.message) });
       return;
     }
     if (data.session) {

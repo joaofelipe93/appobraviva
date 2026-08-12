@@ -11,9 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Link } from "@tanstack/react-router";
 import {
   criarPreCadastro,
   listarPreCadastros,
+  meuPerfil,
   removerPreCadastro,
 } from "@/lib/obras.functions";
 import { formatarCpf, preCadastroSchema } from "@/lib/obras.schemas";
@@ -40,6 +42,34 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 function Admin() {
+  const perfilFn = useServerFn(meuPerfil);
+  const perfil = useQuery({ queryKey: ["meu-perfil"], queryFn: () => perfilFn({}) });
+
+  if (perfil.isLoading) {
+    return (
+      <AppShell titulo="Administração">
+        <Skeleton className="h-40 w-full" />
+      </AppShell>
+    );
+  }
+
+  if (perfil.data?.papel !== "admin") {
+    return (
+      <AppShell
+        titulo="Acesso restrito"
+        descricao="Esta área é exclusiva do administrador do ObraViva."
+      >
+        <Button asChild variant="outline">
+          <Link to="/painel">Voltar ao painel</Link>
+        </Button>
+      </AppShell>
+    );
+  }
+
+  return <AdminPainel />;
+}
+
+function AdminPainel() {
   const listarFn = useServerFn(listarPreCadastros);
   const criarFn = useServerFn(criarPreCadastro);
   const removerFn = useServerFn(removerPreCadastro);
