@@ -519,7 +519,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
       .select(
-        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, etapas_atualizadas, midias(id, tipo, path), obras(nome, engenheiro_id)",
+        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, etapas_atualizadas, midias(id, tipo, path), obras(nome, engenheiro_id)",
       )
       .eq("id", data.atualizacaoId)
       .maybeSingle();
