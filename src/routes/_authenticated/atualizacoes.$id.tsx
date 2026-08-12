@@ -38,6 +38,8 @@ export const Route = createFileRoute("/_authenticated/atualizacoes/$id")({
 function AtualizacaoPage() {
   const { id } = Route.useParams();
   const obterFn = useServerFn(obterAtualizacao);
+  const gerarFn = useServerFn(gerarResumoRelatorio);
+  const [gerando, setGerando] = useState(false);
   const consulta = useQuery({
     queryKey: ["atualizacao", id],
     queryFn: () => obterFn({ data: { atualizacaoId: id } }),
