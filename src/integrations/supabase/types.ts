@@ -26,6 +26,8 @@ export type Database = {
           id: string
           obra_id: string
           observacoes: string
+          resumo_ia: Json | null
+          resumo_ia_em: string | null
         }
         Insert: {
           created_at?: string
@@ -38,6 +40,8 @@ export type Database = {
           id?: string
           obra_id: string
           observacoes?: string
+          resumo_ia?: Json | null
+          resumo_ia_em?: string | null
         }
         Update: {
           created_at?: string
@@ -50,6 +54,8 @@ export type Database = {
           id?: string
           obra_id?: string
           observacoes?: string
+          resumo_ia?: Json | null
+          resumo_ia_em?: string | null
         }
         Relationships: [
           {
