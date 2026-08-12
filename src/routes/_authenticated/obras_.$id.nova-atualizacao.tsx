@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import {
   criarAtualizacao,
+  excluirAtualizacao,
   obterObra,
   gerarResumoRelatorio,
   processarExcel,
