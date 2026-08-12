@@ -143,6 +143,68 @@ function AtualizacaoPage() {
         )}
 
         {dados.excel_dados && (
+          <Card className="rounded-sm border-l-4 border-l-accent bg-secondary/40">
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 font-display uppercase">
+                <Sparkles className="h-4 w-4 text-accent" /> Resumo da IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {dados.resumo_ia ? (
+                <>
+                  <p className="font-display text-base font-semibold uppercase">
+                    {dados.resumo_ia.titulo}
+                  </p>
+                  <p className="text-sm leading-relaxed">{dados.resumo_ia.resumo}</p>
+                  {dados.resumo_ia.pontos.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {dados.resumo_ia.pontos.map((ponto, indice) => (
+                        <li key={indice} className="flex gap-2 text-sm leading-relaxed">
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {dados.souEngenheiro
+                    ? "Nenhum resumo gerado para este relatório ainda."
+                    : "Resumo indisponível para este relatório."}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Texto gerado automaticamente por IA a partir do relatório enviado pelo engenheiro.
+              </p>
+              {dados.souEngenheiro && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={gerando}
+                  onClick={async () => {
+                    setGerando(true);
+                    try {
+                      await gerarFn({ data: { atualizacaoId: id } });
+                      await consulta.refetch();
+                      toast.success("Resumo atualizado!");
+                    } catch (erro) {
+                      toast.error("Não foi possível gerar o resumo", {
+                        description: erro instanceof Error ? erro.message : undefined,
+                      });
+                    } finally {
+                      setGerando(false);
+                    }
+                  }}
+                >
+                  {gerando ? "Gerando..." : dados.resumo_ia ? "Gerar novamente" : "Gerar resumo"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {dados.excel_dados && (
           <Card className="rounded-sm">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-display uppercase">
