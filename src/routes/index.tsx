@@ -73,7 +73,7 @@ function Login() {
       });
       setCarregando(false);
       if (error) {
-        toast.error("Não foi possível enviar o e-mail", { description: error.message });
+        toast.error("Não foi possível enviar o e-mail", { description: mensagemDeErro(error.message) });
         return;
       }
       toast.success("E-mail enviado", {
@@ -88,7 +88,7 @@ function Login() {
       const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
       setCarregando(false);
       if (error) {
-        toast.error("Não foi possível entrar", { description: error.message });
+        toast.error("Não foi possível entrar", { description: mensagemDeErro(error.message) });
         return;
       }
       await router.navigate({ to: "/painel" });
@@ -133,7 +133,7 @@ function Login() {
     setCarregando(false);
 
     if (error) {
-      toast.error("Não foi possível criar a conta", { description: error.message });
+      toast.error("Não foi possível criar a conta", { description: mensagemDeErro(error.message) });
       return;
     }
     if (data.session) {
