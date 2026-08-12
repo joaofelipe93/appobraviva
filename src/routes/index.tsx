@@ -141,7 +141,7 @@ function Login() {
       return;
     }
     toast.success("Conta criada", {
-      description: "Confirme o e-mail que enviamos e depois faça login.",
+      description: "Agora entre com o e-mail e a senha que você cadastrou.",
     });
     setModo("entrar");
   }
