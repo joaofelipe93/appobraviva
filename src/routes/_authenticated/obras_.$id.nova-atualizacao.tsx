@@ -67,6 +67,7 @@ function NovaAtualizacao() {
 
   const obterFn = useServerFn(obterObra);
   const criar = useServerFn(criarAtualizacao);
+  const excluir = useServerFn(excluirAtualizacao);
   const registrar = useServerFn(registrarMidias);
   const processar = useServerFn(processarExcel);
   const gerarResumo = useServerFn(gerarResumoRelatorio);
