@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   criarAtualizacao,
   obterObra,
+  gerarResumoRelatorio,
   processarExcel,
   registrarMidias,
   salvarEtapa,
@@ -50,6 +51,7 @@ function NovaAtualizacao() {
   const criar = useServerFn(criarAtualizacao);
   const registrar = useServerFn(registrarMidias);
   const processar = useServerFn(processarExcel);
+  const gerarResumo = useServerFn(gerarResumoRelatorio);
   const atualizarEtapa = useServerFn(salvarEtapa);
 
   const obra = useQuery({ queryKey: ["obra", id], queryFn: () => obterFn({ data: { obraId: id } }) });
@@ -132,6 +134,18 @@ function NovaAtualizacao() {
         if (error) throw new Error(error.message);
         const dados = await processar({ data: { atualizacaoId, path, nome: excel.name } });
         if (dados.aviso) toast.warning(dados.aviso);
+
+        setProgresso("Gerando resumo com IA...");
+        try {
+          await gerarResumo({ data: { atualizacaoId } });
+        } catch (erro) {
+          toast.warning("Resumo da IA não gerado", {
+            description:
+              erro instanceof Error
+                ? erro.message
+                : "Você pode gerar o resumo na tela da atualização.",
+          });
+        }
       }
 
       if (concluidas.length > 0) {
