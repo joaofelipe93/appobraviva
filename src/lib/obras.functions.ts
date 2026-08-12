@@ -12,7 +12,7 @@ import {
   vincularClienteSchema,
   ETAPAS_PADRAO,
 } from "./obras.schemas";
-import type { ExcelDados } from "./obras.schemas";
+import type { ExcelDados, ResumoIA } from "./obras.schemas";
 import { z } from "zod";
 
 export const registrarPerfil = createServerFn({ method: "POST" })
