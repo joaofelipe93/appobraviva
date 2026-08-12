@@ -32,6 +32,12 @@ export type ExcelDados = {
   aviso?: string;
 };
 
+export type ResumoIA = {
+  titulo: string;
+  resumo: string;
+  pontos: string[];
+};
+
 export function soDigitos(valor: string): string {
   return (valor ?? "").replace(/\D/g, "");
 }
