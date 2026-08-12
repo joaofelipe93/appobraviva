@@ -1,13 +1,7 @@
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { streamText, Output } from "ai";
 import { z } from "zod";
-import type { ExcelDados } from "./obras.schemas";
-
-export type ResumoIA = {
-  titulo: string;
-  resumo: string;
-  pontos: string[];
-};
+import type { ExcelDados, ResumoIA } from "./obras.schemas";
 
 const saidaSchema = z.object({
   titulo: z.string(),
