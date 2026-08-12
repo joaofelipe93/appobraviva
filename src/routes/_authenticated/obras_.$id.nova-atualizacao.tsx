@@ -181,6 +181,14 @@ function NovaAtualizacao() {
       toast.success("Atualização publicada!");
       await router.navigate({ to: "/atualizacoes/$id", params: { id: atualizacaoId } });
     } catch (erro) {
+      if (atualizacaoId) {
+        // Desfaz a atualização criada para não deixar publicação vazia/duplicada.
+        try {
+          await excluir({ data: { atualizacaoId } });
+        } catch {
+          /* ignora falha ao desfazer */
+        }
+      }
       toast.error("Não foi possível publicar", {
         description: erro instanceof Error ? erro.message : undefined,
       });
