@@ -131,7 +131,8 @@ function NovaAtualizacao() {
 
       for (const [indice, video] of videos.entries()) {
         setProgresso(`Enviando vídeo ${indice + 1} de ${videos.length}...`);
-        const extensao = video.name.split(".").pop() ?? "mp4";
+        const extensao =
+          (video.name.split(".").pop() ?? "mp4").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp4";
         const path = `${id}/${atualizacaoId}/videos/${crypto.randomUUID()}.${extensao}`;
         const { error } = await supabase.storage
           .from("obras")
