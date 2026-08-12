@@ -184,8 +184,9 @@ function AtualizacaoPage() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Texto gerado automaticamente por IA a partir do relatório enviado pelo engenheiro.
+                Resumo elaborado a partir do relatório da visita técnica.
               </p>
+
               {dados.souEngenheiro && (
                 <Button
                   variant="outline"
