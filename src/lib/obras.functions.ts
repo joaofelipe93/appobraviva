@@ -562,6 +562,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       excel_nome: atualizacao.excel_nome,
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
       excel_dados: (atualizacao.excel_dados as ExcelDados | null) ?? null,
+      resumo_ia: (atualizacao.resumo_ia as ResumoIA | null) ?? null,
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
         .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
