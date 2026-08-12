@@ -622,10 +622,21 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       .select("id, nome")
       .eq("obra_id", atualizacao.obra_id);
 
+    let responsavelNome: string | null = null;
+    if (atualizacao.obras?.engenheiro_id) {
+      const { data: perfil } = await context.supabase
+        .from("profiles")
+        .select("nome")
+        .eq("id", atualizacao.obras.engenheiro_id)
+        .maybeSingle();
+      responsavelNome = perfil?.nome?.trim() || null;
+    }
+
     return {
       id: atualizacao.id,
       obraId: atualizacao.obra_id,
       obraNome: atualizacao.obras?.nome ?? "Obra",
+      responsavelNome,
       data_visita: atualizacao.data_visita,
       observacoes: atualizacao.observacoes,
       excel_nome: atualizacao.excel_nome,
