@@ -43,6 +43,23 @@ export const Route = createFileRoute("/_authenticated/obras_/$id/nova-atualizaca
 
 const MAX_VIDEO_MB = 100;
 
+/** Remove acentos, espaços e caracteres não aceitos pelo armazenamento. */
+function nomeSeguroDeArquivo(nome: string): string {
+  const ponto = nome.lastIndexOf(".");
+  const base = ponto > 0 ? nome.slice(0, ponto) : nome;
+  const extensao = ponto > 0 ? nome.slice(ponto + 1).toLowerCase() : "";
+  const limpo = base
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80);
+  const seguro = limpo.length > 0 ? limpo : "relatorio";
+  const ext = extensao.replace(/[^a-z0-9]/g, "").slice(0, 8);
+  return ext ? `${seguro}.${ext}` : seguro;
+}
+
 function NovaAtualizacao() {
   const { id } = Route.useParams();
   const router = useRouter();
@@ -129,7 +146,7 @@ function NovaAtualizacao() {
 
       if (excel) {
         setProgresso("Lendo a planilha...");
-        const path = `${id}/${atualizacaoId}/relatorio/${excel.name}`;
+        const path = `${id}/${atualizacaoId}/relatorio/${nomeSeguroDeArquivo(excel.name)}`;
         const { error } = await supabase.storage.from("obras").upload(path, excel);
         if (error) throw new Error(error.message);
         const dados = await processar({ data: { atualizacaoId, path, nome: excel.name } });
