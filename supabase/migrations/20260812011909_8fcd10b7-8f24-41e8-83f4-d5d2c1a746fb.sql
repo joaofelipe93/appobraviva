@@ -1,0 +1,1 @@
+CREATE POLICY "obras_files_engenheiro_update" ON storage.objects FOR UPDATE TO authenticated USING ((bucket_id = 'obras'::text) AND private.is_obra_engenheiro((split_part(name, '/'::text, 1))::uuid)) WITH CHECK ((bucket_id = 'obras'::text) AND private.is_obra_engenheiro((split_part(name, '/'::text, 1))::uuid));
