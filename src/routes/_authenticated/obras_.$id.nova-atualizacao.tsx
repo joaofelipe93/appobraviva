@@ -108,10 +108,12 @@ function NovaAtualizacao() {
     }
 
     setProgresso("Criando atualização...");
+    let atualizacaoId: string | null = null;
     try {
-      const { id: atualizacaoId } = await criar({
+      const criada = await criar({
         data: { obraId: id, data_visita: dataVisita, observacoes, etapas_atualizadas: concluidas },
       });
+      atualizacaoId = criada.id;
 
       const midias: { tipo: "foto" | "video"; path: string }[] = [];
 
