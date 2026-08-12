@@ -510,6 +510,59 @@ export const processarExcel = createServerFn({ method: "POST" })
     return dados;
   });
 
+export const gerarResumoRelatorio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ atualizacaoId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: atualizacao, error } = await context.supabase
+      .from("atualizacoes")
+      .select("id, data_visita, observacoes, excel_dados, obras(nome, engenheiro_id)")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!atualizacao) throw new Error("Atualização não encontrada");
+    if (atualizacao.obras?.engenheiro_id !== context.userId) {
+      throw new Error("Apenas o engenheiro responsável pode gerar o resumo.");
+    }
+
+    const dados = (atualizacao.excel_dados as ExcelDados | null) ?? null;
+    if (!dados || dados.linhas.length === 0) {
+      throw new Error("Esta atualização não tem relatório para resumir.");
+    }
+
+    const { gerarResumoDoRelatorio } = await import("./resumo.server");
+
+    let resumo: ResumoIA;
+    try {
+      resumo = await gerarResumoDoRelatorio({
+        dados,
+        obraNome: atualizacao.obras?.nome ?? "Obra",
+        dataVisita: atualizacao.data_visita,
+        observacoes: atualizacao.observacoes,
+      });
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : "";
+      if (mensagem.includes("429")) {
+        throw new Error("Muitas solicitações à IA agora. Tente novamente em alguns instantes.");
+      }
+      if (mensagem.includes("402")) {
+        throw new Error("Os créditos de IA do projeto acabaram. Adicione créditos para continuar.");
+      }
+      console.error("[resumo-ia]", mensagem);
+      throw new Error("Não foi possível gerar o resumo do relatório agora.");
+    }
+
+    const { error: erroUpdate } = await context.supabase
+      .from("atualizacoes")
+      .update({ resumo_ia: resumo, resumo_ia_em: new Date().toISOString() })
+      .eq("id", data.atualizacaoId);
+    if (erroUpdate) throw new Error(erroUpdate.message);
+
+    return resumo;
+  });
+
 export const obterAtualizacao = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
