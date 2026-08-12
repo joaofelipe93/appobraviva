@@ -1,4 +1,5 @@
 import { Link, useRouter } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { HardHat, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,13 @@ export function AppShell({
   acao?: ReactNode;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   async function sair() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
     await supabase.auth.signOut();
-    await router.navigate({ to: "/" });
+    await router.navigate({ to: "/", replace: true });
   }
 
   return (
