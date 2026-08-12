@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { obterAtualizacao } from "@/lib/obras.functions";
+import { gerarResumoRelatorio, obterAtualizacao } from "@/lib/obras.functions";
 
 export const Route = createFileRoute("/_authenticated/atualizacoes/$id")({
   head: () => ({
