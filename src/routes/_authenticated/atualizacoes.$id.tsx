@@ -214,7 +214,7 @@ function AtualizacaoPage() {
           </Card>
         )}
 
-        {dados.excel_dados && (
+        {dados.excel_dados && dados.souEngenheiro && (
           <Card className="rounded-sm">
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 font-display uppercase">
