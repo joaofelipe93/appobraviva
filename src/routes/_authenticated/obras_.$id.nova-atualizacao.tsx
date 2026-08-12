@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import {
   criarAtualizacao,
+  excluirAtualizacao,
   obterObra,
   gerarResumoRelatorio,
   processarExcel,
@@ -66,6 +67,7 @@ function NovaAtualizacao() {
 
   const obterFn = useServerFn(obterObra);
   const criar = useServerFn(criarAtualizacao);
+  const excluir = useServerFn(excluirAtualizacao);
   const registrar = useServerFn(registrarMidias);
   const processar = useServerFn(processarExcel);
   const gerarResumo = useServerFn(gerarResumoRelatorio);
@@ -107,10 +109,12 @@ function NovaAtualizacao() {
     }
 
     setProgresso("Criando atualização...");
+    let atualizacaoId: string | null = null;
     try {
-      const { id: atualizacaoId } = await criar({
+      const criada = await criar({
         data: { obraId: id, data_visita: dataVisita, observacoes, etapas_atualizadas: concluidas },
       });
+      atualizacaoId = criada.id;
 
       const midias: { tipo: "foto" | "video"; path: string }[] = [];
 
@@ -178,6 +182,14 @@ function NovaAtualizacao() {
       toast.success("Atualização publicada!");
       await router.navigate({ to: "/atualizacoes/$id", params: { id: atualizacaoId } });
     } catch (erro) {
+      if (atualizacaoId) {
+        // Desfaz a atualização criada para não deixar publicação vazia/duplicada.
+        try {
+          await excluir({ data: { atualizacaoId } });
+        } catch {
+          /* ignora falha ao desfazer */
+        }
+      }
       toast.error("Não foi possível publicar", {
         description: erro instanceof Error ? erro.message : undefined,
       });

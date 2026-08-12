@@ -437,6 +437,22 @@ export const criarAtualizacao = createServerFn({ method: "POST" })
     return { id: criada.id };
   });
 
+export const excluirAtualizacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ atualizacaoId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("atualizacoes")
+      .delete()
+      .eq("id", data.atualizacaoId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+
+
 export const registrarMidias = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => midiasSchema.parse(input))
