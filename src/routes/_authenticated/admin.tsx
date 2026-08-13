@@ -74,11 +74,14 @@ function AdminPainel() {
   const listarFn = useServerFn(listarPreCadastros);
   const criarFn = useServerFn(criarPreCadastro);
   const removerFn = useServerFn(removerPreCadastro);
+  const obrasFn = useServerFn(listarObrasAdmin);
   const queryClient = useQueryClient();
   const [papel, setPapel] = useState<"engenheiro" | "cliente">("cliente");
   const [cpf, setCpf] = useState("");
+  const [obraId, setObraId] = useState("");
 
   const lista = useQuery({ queryKey: ["pre-cadastros"], queryFn: () => listarFn({}) });
+  const obras = useQuery({ queryKey: ["obras-admin"], queryFn: () => obrasFn({}) });
 
   const criar = useMutation({
     mutationFn: (valores: {
@@ -86,10 +89,13 @@ function AdminPainel() {
       cpf: string;
       email: string;
       papel: "engenheiro" | "cliente";
+      obraId?: string;
+      unidade?: string;
     }) => criarFn({ data: valores }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
       setCpf("");
+      setObraId("");
       toast.success("Pré-cadastro liberado.");
     },
     onError: (erro) => toast.error("Não foi possível liberar", { description: erro.message }),
@@ -113,6 +119,8 @@ function AdminPainel() {
       cpf: String(dados.get("cpf") ?? ""),
       email: dados.get("email"),
       papel,
+      obraId: papel === "cliente" ? obraId : "",
+      unidade: papel === "cliente" ? String(dados.get("unidade") ?? "") : "",
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
