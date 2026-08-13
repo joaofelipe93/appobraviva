@@ -198,6 +198,39 @@ function AdminPainel() {
                   className="rounded-sm"
                 />
               </div>
+              {papel === "cliente" && (
+                <div className="space-y-4 rounded-sm border border-dashed border-border p-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="pc-obra">Obra vinculada</Label>
+                    <select
+                      id="pc-obra"
+                      value={obraId}
+                      onChange={(e) => setObraId(e.target.value)}
+                      className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">Sem vínculo (definir depois)</option>
+                      {(obras.data ?? []).map((obra) => (
+                        <option key={obra.id} value={obra.id}>
+                          {obra.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pc-unidade">Casa / unidade</Label>
+                    <Input
+                      id="pc-unidade"
+                      name="unidade"
+                      maxLength={60}
+                      placeholder="Ex.: Casa 1"
+                      className="rounded-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O cliente verá somente as informações desta casa.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={criar.isPending}>
                 <UserPlus className="mr-1 h-4 w-4" />
                 {criar.isPending ? "Liberando..." : "Liberar acesso"}
