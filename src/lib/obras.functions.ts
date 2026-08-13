@@ -32,11 +32,11 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     if (!papel) {
       const { data: liberacao } = await supabaseAdmin
         .from("pre_cadastros")
-        .select("id, nome, papel, usado_por")
+        .select("id, nome, papel, usado_por, email")
         .eq("cpf", data.cpf)
         .maybeSingle();
 
-      if (!liberacao) {
+      if (!liberacao || liberacao.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
         throw new Error(
           "Este CPF não foi liberado pelo administrador. Solicite o pré-cadastro para acessar.",
         );
@@ -44,6 +44,7 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       if (liberacao.usado_por && liberacao.usado_por !== context.userId) {
         throw new Error("Este CPF já está vinculado a outra conta.");
       }
+
       papel = liberacao.papel;
 
       await supabaseAdmin
