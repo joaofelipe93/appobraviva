@@ -210,10 +210,9 @@ function Login() {
           {modo !== "recuperar" && (
           <div className="space-y-1.5">
             <Label htmlFor="senha">Senha</Label>
-            <Input
+            <SenhaInput
               id="senha"
               name="senha"
-              type="password"
               required
               minLength={modo === "criar" ? 8 : 6}
               autoComplete={modo === "criar" ? "new-password" : "current-password"}
