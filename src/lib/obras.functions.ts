@@ -718,10 +718,10 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
         : {},
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
-        .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
+        .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
       videos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "video")
-        .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
+        .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
       etapasAtualizadas: (etapas ?? []).filter((e) =>
         (atualizacao.etapas_atualizadas ?? []).includes(e.id),
       ),
