@@ -9,6 +9,7 @@ import { verificarLiberacao } from "@/lib/obras.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SenhaInput } from "@/components/ui/senha-input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/")({
@@ -209,10 +210,9 @@ function Login() {
           {modo !== "recuperar" && (
           <div className="space-y-1.5">
             <Label htmlFor="senha">Senha</Label>
-            <Input
+            <SenhaInput
               id="senha"
               name="senha"
-              type="password"
               required
               minLength={modo === "criar" ? 8 : 6}
               autoComplete={modo === "criar" ? "new-password" : "current-password"}

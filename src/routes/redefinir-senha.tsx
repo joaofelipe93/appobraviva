@@ -4,7 +4,7 @@ import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SenhaInput } from "@/components/ui/senha-input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/redefinir-senha")({
@@ -119,10 +119,9 @@ function RedefinirSenha() {
           <form onSubmit={salvar} className="mt-4 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="senha">Nova senha</Label>
-              <Input
+              <SenhaInput
                 id="senha"
                 name="senha"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
@@ -131,10 +130,9 @@ function RedefinirSenha() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="confirmacao">Confirme a nova senha</Label>
-              <Input
+              <SenhaInput
                 id="confirmacao"
                 name="confirmacao"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
