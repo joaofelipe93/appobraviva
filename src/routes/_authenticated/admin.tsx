@@ -260,6 +260,12 @@ function AdminPainel() {
                   <p className="text-sm text-muted-foreground">
                     {formatarCpf(item.cpf)} · {item.email}
                   </p>
+                  {item.papel === "cliente" && (item.obra_nome || item.unidade) && (
+                    <p className="text-xs text-muted-foreground">
+                      {item.obra_nome ?? "Obra removida"}
+                      {item.unidade ? ` · ${item.unidade}` : ""}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="uppercase">
