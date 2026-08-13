@@ -120,10 +120,9 @@ function RedefinirSenha() {
           <form onSubmit={salvar} className="mt-4 space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="senha">Nova senha</Label>
-              <Input
+              <SenhaInput
                 id="senha"
                 name="senha"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
@@ -132,10 +131,9 @@ function RedefinirSenha() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="confirmacao">Confirme a nova senha</Label>
-              <Input
+              <SenhaInput
                 id="confirmacao"
                 name="confirmacao"
-                type="password"
                 required
                 minLength={8}
                 autoComplete="new-password"
