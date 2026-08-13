@@ -4,7 +4,6 @@ import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { SenhaInput } from "@/components/ui/senha-input";
 import { Label } from "@/components/ui/label";
 
