@@ -114,7 +114,7 @@ function AtualizacaoPage() {
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {dados.fotos.map((foto) => (
-                <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer">
+                <a key={foto.id} href={foto.url} target="_blank" rel="noreferrer" title={foto.unidade ?? "Geral"}>
                   <img
                     src={foto.url}
                     alt={`Foto da visita em ${dados.obraNome}`}
@@ -156,6 +156,9 @@ function AtualizacaoPage() {
                 <p className="text-xs text-muted-foreground">
                   Responsável técnico: {dados.responsavelNome}
                 </p>
+              )}
+              {dados.unidade && (
+                <p className="text-xs font-semibold uppercase text-accent">{dados.unidade}</p>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
@@ -210,6 +213,38 @@ function AtualizacaoPage() {
                   {gerando ? "Gerando..." : dados.resumo_ia ? "Gerar novamente" : "Gerar resumo"}
                 </Button>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {dados.souEngenheiro && Object.keys(dados.resumosUnidades).length > 0 && (
+          <Card className="rounded-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="font-display uppercase">Resumos por casa</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Cada cliente vê apenas o resumo da casa vinculada a ele.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Object.entries(dados.resumosUnidades).map(([unidade, resumo]) => (
+                <div key={unidade} className="space-y-2 rounded-sm border border-border p-3">
+                  <p className="font-display text-sm font-semibold uppercase text-accent">
+                    {unidade}
+                  </p>
+                  <p className="text-sm font-semibold">{resumo.titulo}</p>
+                  <p className="text-sm leading-relaxed">{resumo.resumo}</p>
+                  {resumo.pontos.length > 0 && (
+                    <ul className="space-y-1.5">
+                      {resumo.pontos.map((ponto, indice) => (
+                        <li key={indice} className="flex gap-2 text-sm leading-relaxed">
+                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                          <span>{ponto}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
             </CardContent>
           </Card>
         )}
