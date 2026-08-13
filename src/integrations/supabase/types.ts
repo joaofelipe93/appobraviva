@@ -28,6 +28,7 @@ export type Database = {
           observacoes: string
           resumo_ia: Json | null
           resumo_ia_em: string | null
+          resumos_unidades: Json | null
         }
         Insert: {
           created_at?: string
@@ -42,6 +43,7 @@ export type Database = {
           observacoes?: string
           resumo_ia?: Json | null
           resumo_ia_em?: string | null
+          resumos_unidades?: Json | null
         }
         Update: {
           created_at?: string
@@ -56,6 +58,7 @@ export type Database = {
           observacoes?: string
           resumo_ia?: Json | null
           resumo_ia_em?: string | null
+          resumos_unidades?: Json | null
         }
         Relationships: [
           {
@@ -138,6 +141,7 @@ export type Database = {
           id: string
           path: string
           tipo: Database["public"]["Enums"]["midia_tipo"]
+          unidade: string | null
         }
         Insert: {
           atualizacao_id: string
@@ -145,6 +149,7 @@ export type Database = {
           id?: string
           path: string
           tipo: Database["public"]["Enums"]["midia_tipo"]
+          unidade?: string | null
         }
         Update: {
           atualizacao_id?: string
@@ -152,6 +157,7 @@ export type Database = {
           id?: string
           path?: string
           tipo?: Database["public"]["Enums"]["midia_tipo"]
+          unidade?: string | null
         }
         Relationships: [
           {
@@ -168,16 +174,19 @@ export type Database = {
           cliente_id: string
           created_at: string
           obra_id: string
+          unidade: string | null
         }
         Insert: {
           cliente_id: string
           created_at?: string
           obra_id: string
+          unidade?: string | null
         }
         Update: {
           cliente_id?: string
           created_at?: string
           obra_id?: string
+          unidade?: string | null
         }
         Relationships: [
           {

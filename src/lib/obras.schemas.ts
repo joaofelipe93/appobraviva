@@ -88,9 +88,17 @@ export const criarObraSchema = z.object({
   previsao_termino: z.string().trim().max(10).optional(),
 });
 
+export const unidadeSchema = z
+  .string()
+  .trim()
+  .max(60)
+  .optional()
+  .transform((valor) => (valor && valor.length > 0 ? valor : undefined));
+
 export const vincularClienteSchema = z.object({
   obraId: z.string().uuid(),
   cpf: cpfSchema,
+  unidade: unidadeSchema,
 });
 
 export const etapaUpdateSchema = z.object({
@@ -118,6 +126,7 @@ export const midiasSchema = z.object({
       z.object({
         tipo: z.enum(["foto", "video"]),
         path: z.string().trim().min(3).max(400),
+        unidade: unidadeSchema,
       }),
     )
     .max(40),
@@ -139,4 +148,77 @@ export function progressoDasEtapas(
     0,
   );
   return Math.round((total / etapas.length) * 100);
+}
+
+/** Resumos por casa/unidade guardados junto da atualização. */
+export type ResumosUnidades = Record<string, ResumoIA>;
+
+/** Normaliza o rótulo de uma casa/unidade ("casa 01" -> "Casa 1"). */
+export function normalizarUnidade(valor: string | null | undefined): string | null {
+  const texto = (valor ?? "").replace(/\s+/g, " ").trim();
+  if (!texto) return null;
+  const casada = texto.match(
+    /(casa|lote|unidade|apto|apartamento|quadra|torre|bloco)\s*(?:n[º°.]?|nº|no\.?|#|:|-)?\s*([0-9]{1,4})\s*([a-zA-Z])?/i,
+  );
+  if (casada) {
+    const tipo = casada[1]!.toLowerCase();
+    const rotulo = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+    const numero = String(Number(casada[2]));
+    const sufixo = casada[3] ? casada[3].toUpperCase() : "";
+    return `${rotulo} ${numero}${sufixo}`;
+  }
+  return texto.slice(0, 60);
+}
+
+export function mesmaUnidade(a: string | null | undefined, b: string | null | undefined): boolean {
+  const na = normalizarUnidade(a);
+  const nb = normalizarUnidade(b);
+  if (!na || !nb) return true;
+  return na.toLowerCase() === nb.toLowerCase();
+}
+
+/** Detecta a casa/unidade a partir do texto das células da linha (Item/Descrição). */
+export function detectarUnidadeDaLinha(linha: Record<string, string>): string | null {
+  for (const valor of Object.values(linha)) {
+    const unidade = normalizarUnidade(
+      /(casa|lote|unidade|apto|apartamento)/i.test(valor ?? "") ? valor : "",
+    );
+    if (unidade) return unidade;
+  }
+  return null;
+}
+
+/** Mantém apenas as linhas da casa informada (linhas sem casa detectada são gerais). */
+export function filtrarExcelPorUnidade(
+  dados: ExcelDados | null,
+  unidade: string | null | undefined,
+): ExcelDados | null {
+  if (!dados) return null;
+  const alvo = normalizarUnidade(unidade);
+  if (!alvo) return dados;
+  const linhas = dados.linhas.filter((linha) => {
+    const daLinha = detectarUnidadeDaLinha(linha);
+    return !daLinha || daLinha.toLowerCase() === alvo.toLowerCase();
+  });
+  return { ...dados, linhas };
+}
+
+/** Agrupa as linhas do relatório por casa/unidade detectada. */
+export function agruparExcelPorUnidade(dados: ExcelDados): Map<string, ExcelDados> {
+  const grupos = new Map<string, ExcelDados>();
+  const gerais: Record<string, string>[] = [];
+  for (const linha of dados.linhas) {
+    const unidade = detectarUnidadeDaLinha(linha);
+    if (!unidade) {
+      gerais.push(linha);
+      continue;
+    }
+    const atual = grupos.get(unidade);
+    if (atual) atual.linhas.push(linha);
+    else grupos.set(unidade, { colunas: dados.colunas, linhas: [linha] });
+  }
+  if (gerais.length > 0) {
+    for (const grupo of grupos.values()) grupo.linhas = [...gerais, ...grupo.linhas];
+  }
+  return grupos;
 }

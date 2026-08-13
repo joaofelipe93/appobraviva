@@ -11,8 +11,11 @@ import {
   preCadastroSchema,
   vincularClienteSchema,
   ETAPAS_PADRAO,
+  agruparExcelPorUnidade,
+  filtrarExcelPorUnidade,
+  normalizarUnidade,
 } from "./obras.schemas";
-import type { ExcelDados, ResumoIA } from "./obras.schemas";
+import type { ExcelDados, ResumoIA, ResumosUnidades } from "./obras.schemas";
 import { z } from "zod";
 
 export const registrarPerfil = createServerFn({ method: "POST" })
@@ -229,19 +232,39 @@ export const obterObra = createServerFn({ method: "GET" })
           .eq("obra_id", data.obraId)
           .order("data_visita", { ascending: false })
           .order("created_at", { ascending: false }),
-        context.supabase.from("obra_clientes").select("cliente_id").eq("obra_id", data.obraId),
+        context.supabase
+          .from("obra_clientes")
+          .select("cliente_id, unidade")
+          .eq("obra_id", data.obraId),
         context.supabase.from("leituras").select("atualizacao_id").eq("user_id", context.userId),
       ]);
 
     const clienteIds = (vinculos ?? []).map((v) => v.cliente_id);
-    let clientes: { id: string; nome: string; email: string; cpf: string | null }[] = [];
+    let clientes: {
+      id: string;
+      nome: string;
+      email: string;
+      cpf: string | null;
+      unidade: string | null;
+    }[] = [];
     if (clienteIds.length > 0) {
       const { data: perfis } = await context.supabase
         .from("profiles")
         .select("id, nome, email, cpf")
         .in("id", clienteIds);
-      clientes = perfis ?? [];
+      clientes = (perfis ?? []).map((perfil) => ({
+        ...perfil,
+        unidade: (vinculos ?? []).find((v) => v.cliente_id === perfil.id)?.unidade ?? null,
+      }));
     }
+
+    const unidades = Array.from(
+      new Set(
+        (vinculos ?? [])
+          .map((v) => normalizarUnidade(v.unidade))
+          .filter((u): u is string => !!u),
+      ),
+    ).sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
 
     const lidas = new Set((leituras ?? []).map((l) => l.atualizacao_id));
     const souEngenheiro = obra.engenheiro_id === context.userId;
@@ -270,6 +293,7 @@ export const obterObra = createServerFn({ method: "GET" })
       souEngenheiro,
       etapas: etapas ?? [],
       clientes,
+      unidades,
       urls: capas,
       atualizacoes: (atualizacoes ?? []).map((a) => ({
         id: a.id,
@@ -353,10 +377,14 @@ export const vincularCliente = createServerFn({ method: "POST" })
       throw new Error("Esta conta não é uma conta de cliente.");
     }
 
+    const unidade = normalizarUnidade(data.unidade);
     const { error } = await context.supabase
       .from("obra_clientes")
-      .insert({ obra_id: data.obraId, cliente_id: perfil.id });
-    if (error && !error.message.includes("duplicate")) throw new Error(error.message);
+      .upsert(
+        { obra_id: data.obraId, cliente_id: perfil.id, unidade },
+        { onConflict: "obra_id,cliente_id" },
+      );
+    if (error) throw new Error(error.message);
 
     return { nome: perfil.nome };
   });
@@ -464,6 +492,7 @@ export const registrarMidias = createServerFn({ method: "POST" })
         atualizacao_id: data.atualizacaoId,
         tipo: m.tipo,
         path: m.path,
+        unidade: normalizarUnidade(m.unidade),
       })),
     );
     if (error) throw new Error(error.message);
@@ -550,15 +579,28 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
     }
 
     const { gerarResumoDoRelatorio } = await import("./resumo.server");
+    const obraNome = atualizacao.obras?.nome ?? "Obra";
 
     let resumo: ResumoIA;
+    const resumosUnidades: ResumosUnidades = {};
     try {
       resumo = await gerarResumoDoRelatorio({
         dados,
-        obraNome: atualizacao.obras?.nome ?? "Obra",
+        obraNome,
         dataVisita: atualizacao.data_visita,
         observacoes: atualizacao.observacoes,
       });
+
+      // Um resumo por casa/unidade detectada no relatório, para cada cliente ver só a sua.
+      const grupos = agruparExcelPorUnidade(dados);
+      for (const [unidade, dadosUnidade] of grupos) {
+        resumosUnidades[unidade] = await gerarResumoDoRelatorio({
+          dados: dadosUnidade,
+          obraNome: `${obraNome} — ${unidade}`,
+          dataVisita: atualizacao.data_visita,
+          observacoes: atualizacao.observacoes,
+        });
+      }
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : "";
       if (mensagem.includes("429")) {
@@ -573,7 +615,11 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
 
     const { error: erroUpdate } = await context.supabase
       .from("atualizacoes")
-      .update({ resumo_ia: resumo, resumo_ia_em: new Date().toISOString() })
+      .update({
+        resumo_ia: resumo,
+        resumos_unidades: resumosUnidades,
+        resumo_ia_em: new Date().toISOString(),
+      })
       .eq("id", data.atualizacaoId);
     if (erroUpdate) throw new Error(erroUpdate.message);
 
@@ -589,7 +635,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
       .select(
-        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, etapas_atualizadas, midias(id, tipo, path), obras(nome, engenheiro_id)",
+        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, resumos_unidades, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
       )
       .eq("id", data.atualizacaoId)
       .maybeSingle();
@@ -609,6 +655,18 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     }
 
     const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
+
+    let minhaUnidade: string | null = null;
+    if (!souEngenheiro) {
+      const { data: vinculo } = await context.supabase
+        .from("obra_clientes")
+        .select("unidade")
+        .eq("obra_id", atualizacao.obra_id)
+        .eq("cliente_id", context.userId)
+        .maybeSingle();
+      minhaUnidade = normalizarUnidade(vinculo?.unidade);
+    }
+
     if (!souEngenheiro) {
       await context.supabase
         .from("leituras")
@@ -642,14 +700,28 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       observacoes: atualizacao.observacoes,
       excel_nome: atualizacao.excel_nome,
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
-      excel_dados: (atualizacao.excel_dados as ExcelDados | null) ?? null,
-      resumo_ia: (atualizacao.resumo_ia as ResumoIA | null) ?? null,
+      unidade: minhaUnidade,
+      excel_dados: souEngenheiro
+        ? ((atualizacao.excel_dados as ExcelDados | null) ?? null)
+        : filtrarExcelPorUnidade(atualizacao.excel_dados as ExcelDados | null, minhaUnidade),
+      resumo_ia: (() => {
+        const geral = (atualizacao.resumo_ia as ResumoIA | null) ?? null;
+        if (souEngenheiro || !minhaUnidade) return geral;
+        const porUnidade = (atualizacao.resumos_unidades as ResumosUnidades | null) ?? {};
+        const chave = Object.keys(porUnidade).find(
+          (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
+        );
+        return chave ? porUnidade[chave]! : geral;
+      })(),
+      resumosUnidades: souEngenheiro
+        ? ((atualizacao.resumos_unidades as ResumosUnidades | null) ?? {})
+        : {},
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
-        .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
+        .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
       videos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "video")
-        .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
+        .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
       etapasAtualizadas: (etapas ?? []).filter((e) =>
         (atualizacao.etapas_atualizadas ?? []).includes(e.id),
       ),

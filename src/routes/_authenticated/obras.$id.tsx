@@ -331,12 +331,19 @@ function Clientes({
   onChange,
 }: {
   obraId: string;
-  clientes: { id: string; nome: string; email: string; cpf: string | null }[];
+  clientes: {
+    id: string;
+    nome: string;
+    email: string;
+    cpf: string | null;
+    unidade: string | null;
+  }[];
   onChange: () => Promise<void>;
 }) {
   const vincular = useServerFn(vincularCliente);
   const desvincular = useServerFn(desvincularCliente);
   const [cpf, setCpf] = useState("");
+  const [unidade, setUnidade] = useState("");
   const [enviando, setEnviando] = useState(false);
 
   return (
@@ -355,6 +362,9 @@ function Clientes({
             <p className="font-semibold">{cliente.nome || "Cliente"}</p>
             <p className="text-xs text-muted-foreground">
               {cliente.cpf ? formatarCpf(cliente.cpf) : cliente.email}
+            </p>
+            <p className="text-xs font-semibold uppercase text-accent">
+              {cliente.unidade ? cliente.unidade : "Obra inteira"}
             </p>
           </div>
           <Button
@@ -378,8 +388,9 @@ function Clientes({
           evento.preventDefault();
           setEnviando(true);
           try {
-            const resultado = await vincular({ data: { obraId, cpf } });
+            const resultado = await vincular({ data: { obraId, cpf, unidade } });
             setCpf("");
+            setUnidade("");
             await onChange();
             toast.success(`${resultado.nome || "Cliente"} vinculado à obra.`);
           } catch (erro) {
@@ -406,6 +417,19 @@ function Clientes({
             <UserPlus className="h-4 w-4" />
           </Button>
         </div>
+        <Label htmlFor="unidade-cliente">Casa / unidade do cliente (opcional)</Label>
+        <Input
+          id="unidade-cliente"
+          placeholder="Ex: Casa 1"
+          value={unidade}
+          onChange={(e) => setUnidade(e.target.value)}
+          maxLength={60}
+          className="rounded-sm"
+        />
+        <p className="text-xs text-muted-foreground">
+          Com a casa informada, o cliente vê apenas o resumo e as mídias da casa dele. Em branco, ele
+          vê a obra inteira.
+        </p>
       </form>
     </div>
   );
