@@ -35,7 +35,7 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     if (!papel) {
       const { data: liberacao } = await supabaseAdmin
         .from("pre_cadastros")
-        .select("id, nome, papel, usado_por, email")
+        .select("id, nome, papel, usado_por, email, obra_id, unidade")
         .eq("cpf", data.cpf)
         .maybeSingle();
 
@@ -54,6 +54,18 @@ export const registrarPerfil = createServerFn({ method: "POST" })
         .from("pre_cadastros")
         .update({ usado_em: new Date().toISOString(), usado_por: context.userId })
         .eq("id", liberacao.id);
+
+      // Vínculo automático com a obra/casa definida pelo administrador no pré-cadastro.
+      if (papel === "cliente" && liberacao.obra_id) {
+        await supabaseAdmin.from("obra_clientes").upsert(
+          {
+            obra_id: liberacao.obra_id,
+            cliente_id: context.userId,
+            unidade: normalizarUnidade(liberacao.unidade),
+          },
+          { onConflict: "obra_id,cliente_id" },
+        );
+      }
     }
 
     const { error: perfilErro } = await supabaseAdmin
@@ -107,10 +119,36 @@ export const listarPreCadastros = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { garantirAdmin } = await import("./admin.server");
     await garantirAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await context.supabase
       .from("pre_cadastros")
-      .select("id, nome, cpf, email, papel, usado_em, created_at")
+      .select("id, nome, cpf, email, papel, usado_em, created_at, obra_id, unidade")
       .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    const lista = data ?? [];
+    const ids = [...new Set(lista.map((i) => i.obra_id).filter(Boolean))] as string[];
+    let nomes = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: obras } = await supabaseAdmin.from("obras").select("id, nome").in("id", ids);
+      nomes = new Map((obras ?? []).map((o) => [o.id, o.nome]));
+    }
+    return lista.map((item) => ({
+      ...item,
+      obra_nome: item.obra_id ? (nomes.get(item.obra_id) ?? null) : null,
+    }));
+  });
+
+/** Todas as obras cadastradas, para o admin vincular o cliente já no pré-cadastro. */
+export const listarObrasAdmin = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("obras")
+      .select("id, nome")
+      .order("nome", { ascending: true });
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -121,12 +159,15 @@ export const criarPreCadastro = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { garantirAdmin } = await import("./admin.server");
     await garantirAdmin(context.supabase, context.userId);
+    const cliente = data.papel === "cliente";
     const { error } = await context.supabase.from("pre_cadastros").insert({
       nome: data.nome,
       cpf: data.cpf,
       email: data.email,
       papel: data.papel,
       criado_por: context.userId,
+      obra_id: cliente ? (data.obraId ?? null) : null,
+      unidade: cliente ? (normalizarUnidade(data.unidade) ?? null) : null,
     });
     if (error) {
       if (error.code === "23505" || error.message.includes("duplicate")) {

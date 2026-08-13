@@ -79,6 +79,18 @@ export const preCadastroSchema = z.object({
   cpf: cpfSchema,
   email: z.string().trim().email("E-mail inválido").max(255).toLowerCase(),
   papel: z.enum(["engenheiro", "cliente"]),
+  obraId: z
+    .string()
+    .trim()
+    .uuid()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  unidade: z
+    .string()
+    .trim()
+    .max(60)
+    .optional()
+    .transform((valor) => (valor && valor.length > 0 ? valor : undefined)),
 });
 
 export const criarObraSchema = z.object({

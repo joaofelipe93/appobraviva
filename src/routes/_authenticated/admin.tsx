@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import {
   criarPreCadastro,
+  listarObrasAdmin,
   listarPreCadastros,
   meuPerfil,
   removerPreCadastro,
@@ -73,11 +74,14 @@ function AdminPainel() {
   const listarFn = useServerFn(listarPreCadastros);
   const criarFn = useServerFn(criarPreCadastro);
   const removerFn = useServerFn(removerPreCadastro);
+  const obrasFn = useServerFn(listarObrasAdmin);
   const queryClient = useQueryClient();
   const [papel, setPapel] = useState<"engenheiro" | "cliente">("cliente");
   const [cpf, setCpf] = useState("");
+  const [obraId, setObraId] = useState("");
 
   const lista = useQuery({ queryKey: ["pre-cadastros"], queryFn: () => listarFn({}) });
+  const obras = useQuery({ queryKey: ["obras-admin"], queryFn: () => obrasFn({}) });
 
   const criar = useMutation({
     mutationFn: (valores: {
@@ -85,10 +89,13 @@ function AdminPainel() {
       cpf: string;
       email: string;
       papel: "engenheiro" | "cliente";
+      obraId?: string | undefined;
+      unidade?: string | undefined;
     }) => criarFn({ data: valores }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
       setCpf("");
+      setObraId("");
       toast.success("Pré-cadastro liberado.");
     },
     onError: (erro) => toast.error("Não foi possível liberar", { description: erro.message }),
@@ -112,6 +119,8 @@ function AdminPainel() {
       cpf: String(dados.get("cpf") ?? ""),
       email: dados.get("email"),
       papel,
+      obraId: papel === "cliente" ? obraId : "",
+      unidade: papel === "cliente" ? String(dados.get("unidade") ?? "") : "",
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -189,6 +198,39 @@ function AdminPainel() {
                   className="rounded-sm"
                 />
               </div>
+              {papel === "cliente" && (
+                <div className="space-y-4 rounded-sm border border-dashed border-border p-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="pc-obra">Obra vinculada</Label>
+                    <select
+                      id="pc-obra"
+                      value={obraId}
+                      onChange={(e) => setObraId(e.target.value)}
+                      className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm"
+                    >
+                      <option value="">Sem vínculo (definir depois)</option>
+                      {(obras.data ?? []).map((obra) => (
+                        <option key={obra.id} value={obra.id}>
+                          {obra.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="pc-unidade">Casa / unidade</Label>
+                    <Input
+                      id="pc-unidade"
+                      name="unidade"
+                      maxLength={60}
+                      placeholder="Ex.: Casa 1"
+                      className="rounded-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      O cliente verá somente as informações desta casa.
+                    </p>
+                  </div>
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={criar.isPending}>
                 <UserPlus className="mr-1 h-4 w-4" />
                 {criar.isPending ? "Liberando..." : "Liberar acesso"}
@@ -218,6 +260,12 @@ function AdminPainel() {
                   <p className="text-sm text-muted-foreground">
                     {formatarCpf(item.cpf)} · {item.email}
                   </p>
+                  {item.papel === "cliente" && (item.obra_nome || item.unidade) && (
+                    <p className="text-xs text-muted-foreground">
+                      {item.obra_nome ?? "Obra removida"}
+                      {item.unidade ? ` · ${item.unidade}` : ""}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="uppercase">
