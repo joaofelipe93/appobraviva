@@ -579,15 +579,28 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
     }
 
     const { gerarResumoDoRelatorio } = await import("./resumo.server");
+    const obraNome = atualizacao.obras?.nome ?? "Obra";
 
     let resumo: ResumoIA;
+    const resumosUnidades: ResumosUnidades = {};
     try {
       resumo = await gerarResumoDoRelatorio({
         dados,
-        obraNome: atualizacao.obras?.nome ?? "Obra",
+        obraNome,
         dataVisita: atualizacao.data_visita,
         observacoes: atualizacao.observacoes,
       });
+
+      // Um resumo por casa/unidade detectada no relatório, para cada cliente ver só a sua.
+      const grupos = agruparExcelPorUnidade(dados);
+      for (const [unidade, dadosUnidade] of grupos) {
+        resumosUnidades[unidade] = await gerarResumoDoRelatorio({
+          dados: dadosUnidade,
+          obraNome: `${obraNome} — ${unidade}`,
+          dataVisita: atualizacao.data_visita,
+          observacoes: atualizacao.observacoes,
+        });
+      }
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : "";
       if (mensagem.includes("429")) {
@@ -602,7 +615,11 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
 
     const { error: erroUpdate } = await context.supabase
       .from("atualizacoes")
-      .update({ resumo_ia: resumo, resumo_ia_em: new Date().toISOString() })
+      .update({
+        resumo_ia: resumo,
+        resumos_unidades: resumosUnidades,
+        resumo_ia_em: new Date().toISOString(),
+      })
       .eq("id", data.atualizacaoId);
     if (erroUpdate) throw new Error(erroUpdate.message);
 
@@ -618,7 +635,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
       .select(
-        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, etapas_atualizadas, midias(id, tipo, path), obras(nome, engenheiro_id)",
+        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, resumos_unidades, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
       )
       .eq("id", data.atualizacaoId)
       .maybeSingle();
@@ -638,6 +655,18 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     }
 
     const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
+
+    let minhaUnidade: string | null = null;
+    if (!souEngenheiro) {
+      const { data: vinculo } = await context.supabase
+        .from("obra_clientes")
+        .select("unidade")
+        .eq("obra_id", atualizacao.obra_id)
+        .eq("cliente_id", context.userId)
+        .maybeSingle();
+      minhaUnidade = normalizarUnidade(vinculo?.unidade);
+    }
+
     if (!souEngenheiro) {
       await context.supabase
         .from("leituras")
@@ -671,8 +700,22 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       observacoes: atualizacao.observacoes,
       excel_nome: atualizacao.excel_nome,
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
-      excel_dados: (atualizacao.excel_dados as ExcelDados | null) ?? null,
-      resumo_ia: (atualizacao.resumo_ia as ResumoIA | null) ?? null,
+      unidade: minhaUnidade,
+      excel_dados: souEngenheiro
+        ? ((atualizacao.excel_dados as ExcelDados | null) ?? null)
+        : filtrarExcelPorUnidade(atualizacao.excel_dados as ExcelDados | null, minhaUnidade),
+      resumo_ia: (() => {
+        const geral = (atualizacao.resumo_ia as ResumoIA | null) ?? null;
+        if (souEngenheiro || !minhaUnidade) return geral;
+        const porUnidade = (atualizacao.resumos_unidades as ResumosUnidades | null) ?? {};
+        const chave = Object.keys(porUnidade).find(
+          (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
+        );
+        return chave ? porUnidade[chave]! : geral;
+      })(),
+      resumosUnidades: souEngenheiro
+        ? ((atualizacao.resumos_unidades as ResumosUnidades | null) ?? {})
+        : {},
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
         .map((m) => ({ id: m.id, url: urls[m.path] ?? "" })),
