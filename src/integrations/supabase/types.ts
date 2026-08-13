@@ -236,7 +236,9 @@ export type Database = {
           email: string
           id: string
           nome: string
+          obra_id: string | null
           papel: Database["public"]["Enums"]["app_role"]
+          unidade: string | null
           updated_at: string
           usado_em: string | null
           usado_por: string | null
@@ -248,7 +250,9 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
+          obra_id?: string | null
           papel: Database["public"]["Enums"]["app_role"]
+          unidade?: string | null
           updated_at?: string
           usado_em?: string | null
           usado_por?: string | null
@@ -260,12 +264,22 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
+          obra_id?: string | null
           papel?: Database["public"]["Enums"]["app_role"]
+          unidade?: string | null
           updated_at?: string
           usado_em?: string | null
           usado_por?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pre_cadastros_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
