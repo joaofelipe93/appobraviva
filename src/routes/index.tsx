@@ -9,6 +9,7 @@ import { verificarLiberacao } from "@/lib/obras.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SenhaInput } from "@/components/ui/senha-input";
 import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/")({
