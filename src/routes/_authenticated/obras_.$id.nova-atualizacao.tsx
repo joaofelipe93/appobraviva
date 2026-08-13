@@ -118,7 +118,7 @@ function NovaAtualizacao() {
       });
       atualizacaoId = criada.id;
 
-      const midias: { tipo: "foto" | "video"; path: string; unidade?: string }[] = [];
+      const midias: { tipo: "foto" | "video"; path: string; unidade?: string | undefined }[] = [];
 
       for (const [indice, foto] of fotos.entries()) {
         setProgresso(`Enviando foto ${indice + 1} de ${fotos.length}...`);
