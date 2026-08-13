@@ -89,8 +89,8 @@ function AdminPainel() {
       cpf: string;
       email: string;
       papel: "engenheiro" | "cliente";
-      obraId?: string;
-      unidade?: string;
+      obraId?: string | undefined;
+      unidade?: string | undefined;
     }) => criarFn({ data: valores }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
