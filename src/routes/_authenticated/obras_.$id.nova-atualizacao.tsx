@@ -81,6 +81,8 @@ function NovaAtualizacao() {
   const [videos, setVideos] = useState<File[]>([]);
   const [excel, setExcel] = useState<File | null>(null);
   const [concluidas, setConcluidas] = useState<string[]>([]);
+  const [unidadesFotos, setUnidadesFotos] = useState<Record<number, string>>({});
+  const [unidadesVideos, setUnidadesVideos] = useState<Record<number, string>>({});
   const [progresso, setProgresso] = useState<string | null>(null);
 
   if (obra.isLoading) {
@@ -116,7 +118,7 @@ function NovaAtualizacao() {
       });
       atualizacaoId = criada.id;
 
-      const midias: { tipo: "foto" | "video"; path: string }[] = [];
+      const midias: { tipo: "foto" | "video"; path: string; unidade?: string }[] = [];
 
       for (const [indice, foto] of fotos.entries()) {
         setProgresso(`Enviando foto ${indice + 1} de ${fotos.length}...`);
@@ -130,7 +132,7 @@ function NovaAtualizacao() {
           .from("obras")
           .upload(path, comprimida, { contentType: "image/jpeg" });
         if (error) throw new Error(error.message);
-        midias.push({ tipo: "foto", path });
+        midias.push({ tipo: "foto", path, unidade: unidadesFotos[indice] || undefined });
       }
 
       for (const [indice, video] of videos.entries()) {
@@ -142,7 +144,7 @@ function NovaAtualizacao() {
           .from("obras")
           .upload(path, video, { contentType: video.type || "video/mp4" });
         if (error) throw new Error(error.message);
-        midias.push({ tipo: "video", path });
+        midias.push({ tipo: "video", path, unidade: unidadesVideos[indice] || undefined });
       }
 
       if (midias.length > 0) {
@@ -198,6 +200,8 @@ function NovaAtualizacao() {
     }
   }
 
+  const unidades = obra.data.unidades ?? [];
+
   return (
     <AppShell titulo="Nova atualização" descricao={obra.data.obra.nome}>
       <form onSubmit={publicar} className="grid max-w-3xl gap-6">
@@ -247,10 +251,18 @@ function NovaAtualizacao() {
                 accept="image/*"
                 multiple
                 className="rounded-sm"
-                onChange={(e) => setFotos(Array.from(e.target.files ?? []))}
+                onChange={(e) => {
+                  setFotos(Array.from(e.target.files ?? []));
+                  setUnidadesFotos({});
+                }}
               />
               {fotos.length > 0 && (
-                <p className="text-xs text-muted-foreground">{fotos.length} foto(s) selecionada(s)</p>
+                <SeletorUnidades
+                  arquivos={fotos}
+                  unidades={unidades}
+                  valores={unidadesFotos}
+                  onChange={setUnidadesFotos}
+                />
               )}
             </div>
             <div className="space-y-1">
@@ -263,10 +275,18 @@ function NovaAtualizacao() {
                 accept="video/*"
                 multiple
                 className="rounded-sm"
-                onChange={(e) => setVideos(Array.from(e.target.files ?? []))}
+                onChange={(e) => {
+                  setVideos(Array.from(e.target.files ?? []));
+                  setUnidadesVideos({});
+                }}
               />
               {videos.length > 0 && (
-                <p className="text-xs text-muted-foreground">{videos.length} vídeo(s) selecionado(s)</p>
+                <SeletorUnidades
+                  arquivos={videos}
+                  unidades={unidades}
+                  valores={unidadesVideos}
+                  onChange={setUnidadesVideos}
+                />
               )}
             </div>
           </CardContent>
@@ -324,5 +344,50 @@ function NovaAtualizacao() {
         </div>
       </form>
     </AppShell>
+  );
+}
+
+/** Permite marcar cada foto/vídeo com a casa correspondente. */
+function SeletorUnidades({
+  arquivos,
+  unidades,
+  valores,
+  onChange,
+}: {
+  arquivos: File[];
+  unidades: string[];
+  valores: Record<number, string>;
+  onChange: (valores: Record<number, string>) => void;
+}) {
+  return (
+    <div className="space-y-2 rounded-sm border border-border p-2">
+      <p className="text-xs text-muted-foreground">
+        {arquivos.length} arquivo(s) selecionado(s). Marque a casa de cada um — sem casa, fica
+        visível para todos os clientes da obra.
+      </p>
+      {unidades.length === 0 && (
+        <p className="text-xs text-muted-foreground">
+          Nenhuma casa cadastrada ainda. Informe a casa de cada cliente na tela da obra.
+        </p>
+      )}
+      {arquivos.map((arquivo, indice) => (
+        <div key={`${arquivo.name}-${indice}`} className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-xs">{arquivo.name}</span>
+          <select
+            aria-label={`Casa de ${arquivo.name}`}
+            className="rounded-sm border border-border bg-background px-2 py-1 text-xs"
+            value={valores[indice] ?? ""}
+            onChange={(evento) => onChange({ ...valores, [indice]: evento.target.value })}
+          >
+            <option value="">Geral</option>
+            {unidades.map((unidade) => (
+              <option key={unidade} value={unidade}>
+                {unidade}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
   );
 }
