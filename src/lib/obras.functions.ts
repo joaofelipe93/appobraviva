@@ -685,12 +685,22 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
       .select(
-        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, resumos_unidades, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
+        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
       )
       .eq("id", data.atualizacaoId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!atualizacao) throw new Error("Atualização não encontrada");
+
+    // Acesso à linha já validado pelas regras do banco acima; o conteúdo do
+    // relatório é lido apenas aqui no servidor e filtrado por casa/unidade.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: conteudo } = await supabaseAdmin
+      .from("atualizacoes")
+      .select("excel_dados, resumo_ia, resumos_unidades")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+
 
     const paths = (atualizacao.midias ?? []).map((m) => m.path);
     if (atualizacao.excel_path) paths.push(atualizacao.excel_path);
