@@ -762,20 +762,21 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
       unidade: minhaUnidade,
       excel_dados: souEngenheiro
-        ? ((atualizacao.excel_dados as ExcelDados | null) ?? null)
-        : filtrarExcelPorUnidade(atualizacao.excel_dados as ExcelDados | null, minhaUnidade),
+        ? ((conteudo?.excel_dados as ExcelDados | null) ?? null)
+        : filtrarExcelPorUnidade(conteudo?.excel_dados as ExcelDados | null, minhaUnidade),
       resumo_ia: (() => {
-        const geral = (atualizacao.resumo_ia as ResumoIA | null) ?? null;
+        const geral = (conteudo?.resumo_ia as ResumoIA | null) ?? null;
         if (souEngenheiro || !minhaUnidade) return geral;
-        const porUnidade = (atualizacao.resumos_unidades as ResumosUnidades | null) ?? {};
+        const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
         const chave = Object.keys(porUnidade).find(
           (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
         );
         return chave ? porUnidade[chave]! : geral;
       })(),
       resumosUnidades: souEngenheiro
-        ? ((atualizacao.resumos_unidades as ResumosUnidades | null) ?? {})
+        ? ((conteudo?.resumos_unidades as ResumosUnidades | null) ?? {})
         : {},
+
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
         .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
