@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -56,6 +56,9 @@ function Login() {
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const verificar = useServerFn(verificarLiberacao);
   const [carregando, setCarregando] = useState(false);
+  // Evita envio nativo do formulário (senha na URL) antes da hidratação do React.
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => setPronto(true), []);
 
   async function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
@@ -167,7 +170,7 @@ function Login() {
               : "Informe seu e-mail e enviaremos um link para criar uma nova senha."}
         </p>
 
-        <form onSubmit={enviar} className="mt-6 space-y-4">
+        <form onSubmit={enviar} method="post" className="mt-6 space-y-4">
           {modo === "criar" && (
             <>
               <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -221,7 +224,7 @@ function Login() {
           </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={carregando}>
+          <Button type="submit" className="w-full" disabled={carregando || !pronto}>
             {carregando
               ? "Aguarde..."
               : modo === "entrar"
