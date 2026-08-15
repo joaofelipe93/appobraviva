@@ -605,7 +605,7 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
-      .select("id, data_visita, observacoes, excel_dados, obras(nome, engenheiro_id)")
+      .select("id, data_visita, observacoes, obras(nome, engenheiro_id)")
       .eq("id", data.atualizacaoId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -614,10 +614,19 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
       throw new Error("Apenas o engenheiro responsável pode gerar o resumo.");
     }
 
-    const dados = (atualizacao.excel_dados as ExcelDados | null) ?? null;
+    // Conteúdo do relatório fica fora do alcance do cliente: leitura só no servidor.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sigiloso } = await supabaseAdmin
+      .from("atualizacoes")
+      .select("excel_dados")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+
+    const dados = (sigiloso?.excel_dados as ExcelDados | null) ?? null;
     if (!dados || dados.linhas.length === 0) {
       throw new Error("Esta atualização não tem relatório para resumir.");
     }
+
 
     const { gerarResumoDoRelatorio } = await import("./resumo.server");
     const obraNome = atualizacao.obras?.nome ?? "Obra";
