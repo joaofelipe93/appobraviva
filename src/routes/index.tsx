@@ -56,6 +56,9 @@ function Login() {
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const verificar = useServerFn(verificarLiberacao);
   const [carregando, setCarregando] = useState(false);
+  // Evita envio nativo do formulário (senha na URL) antes da hidratação do React.
+  const [pronto, setPronto] = useState(false);
+  useEffect(() => setPronto(true), []);
 
   async function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
