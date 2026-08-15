@@ -19,6 +19,7 @@ import {
   excluirAtualizacao,
   obterObra,
   gerarResumoRelatorio,
+  notificarAtualizacao,
   processarExcel,
   registrarMidias,
   salvarEtapa,
@@ -72,6 +73,7 @@ function NovaAtualizacao() {
   const processar = useServerFn(processarExcel);
   const gerarResumo = useServerFn(gerarResumoRelatorio);
   const atualizarEtapa = useServerFn(salvarEtapa);
+  const notificar = useServerFn(notificarAtualizacao);
 
   const obra = useQuery({ queryKey: ["obra", id], queryFn: () => obterFn({ data: { obraId: id } }) });
 
@@ -181,7 +183,21 @@ function NovaAtualizacao() {
         }
       }
 
-      toast.success("Atualização publicada!");
+      setProgresso("Avisando os clientes por e-mail...");
+      try {
+        const aviso = await notificar({ data: { atualizacaoId } });
+        if (aviso.enviados > 0) {
+          toast.success(
+            `Atualização publicada! ${aviso.enviados} cliente(s) avisado(s) por e-mail.`,
+          );
+        } else {
+          toast.success("Atualização publicada!");
+        }
+      } catch {
+        toast.success("Atualização publicada!", {
+          description: "Não foi possível enviar os avisos por e-mail agora.",
+        });
+      }
       await router.navigate({ to: "/atualizacoes/$id", params: { id: atualizacaoId } });
     } catch (erro) {
       if (atualizacaoId) {
