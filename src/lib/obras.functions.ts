@@ -605,7 +605,7 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
-      .select("id, data_visita, observacoes, excel_dados, obras(nome, engenheiro_id)")
+      .select("id, data_visita, observacoes, obras(nome, engenheiro_id)")
       .eq("id", data.atualizacaoId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -614,10 +614,19 @@ export const gerarResumoRelatorio = createServerFn({ method: "POST" })
       throw new Error("Apenas o engenheiro responsável pode gerar o resumo.");
     }
 
-    const dados = (atualizacao.excel_dados as ExcelDados | null) ?? null;
+    // Conteúdo do relatório fica fora do alcance do cliente: leitura só no servidor.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sigiloso } = await supabaseAdmin
+      .from("atualizacoes")
+      .select("excel_dados")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+
+    const dados = (sigiloso?.excel_dados as ExcelDados | null) ?? null;
     if (!dados || dados.linhas.length === 0) {
       throw new Error("Esta atualização não tem relatório para resumir.");
     }
+
 
     const { gerarResumoDoRelatorio } = await import("./resumo.server");
     const obraNome = atualizacao.obras?.nome ?? "Obra";
@@ -676,12 +685,22 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
     const { data: atualizacao, error } = await context.supabase
       .from("atualizacoes")
       .select(
-        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, excel_dados, resumo_ia, resumos_unidades, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
+        "id, obra_id, data_visita, observacoes, excel_path, excel_nome, etapas_atualizadas, midias(id, tipo, path, unidade), obras(nome, engenheiro_id)",
       )
       .eq("id", data.atualizacaoId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!atualizacao) throw new Error("Atualização não encontrada");
+
+    // Acesso à linha já validado pelas regras do banco acima; o conteúdo do
+    // relatório é lido apenas aqui no servidor e filtrado por casa/unidade.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: conteudo } = await supabaseAdmin
+      .from("atualizacoes")
+      .select("excel_dados, resumo_ia, resumos_unidades")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+
 
     const paths = (atualizacao.midias ?? []).map((m) => m.path);
     if (atualizacao.excel_path) paths.push(atualizacao.excel_path);
@@ -743,20 +762,21 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
       unidade: minhaUnidade,
       excel_dados: souEngenheiro
-        ? ((atualizacao.excel_dados as ExcelDados | null) ?? null)
-        : filtrarExcelPorUnidade(atualizacao.excel_dados as ExcelDados | null, minhaUnidade),
+        ? ((conteudo?.excel_dados as ExcelDados | null) ?? null)
+        : filtrarExcelPorUnidade(conteudo?.excel_dados as ExcelDados | null, minhaUnidade),
       resumo_ia: (() => {
-        const geral = (atualizacao.resumo_ia as ResumoIA | null) ?? null;
+        const geral = (conteudo?.resumo_ia as ResumoIA | null) ?? null;
         if (souEngenheiro || !minhaUnidade) return geral;
-        const porUnidade = (atualizacao.resumos_unidades as ResumosUnidades | null) ?? {};
+        const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
         const chave = Object.keys(porUnidade).find(
           (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
         );
         return chave ? porUnidade[chave]! : geral;
       })(),
       resumosUnidades: souEngenheiro
-        ? ((atualizacao.resumos_unidades as ResumosUnidades | null) ?? {})
+        ? ((conteudo?.resumos_unidades as ResumosUnidades | null) ?? {})
         : {},
+
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
         .map((m) => ({ id: m.id, url: urls[m.path] ?? "", unidade: m.unidade ?? null })),
