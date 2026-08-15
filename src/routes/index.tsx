@@ -56,6 +56,7 @@ function Login() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const verificar = useServerFn(verificarLiberacao);
+  const recuperar = useServerFn(solicitarRecuperacaoSenha);
   const [carregando, setCarregando] = useState(false);
   // Evita envio nativo do formulário (senha na URL) antes da hidratação do React.
   const [pronto, setPronto] = useState(false);
