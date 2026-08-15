@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { cpfSchema, formatarCpf } from "@/lib/obras.schemas";
 import { verificarLiberacao } from "@/lib/obras.functions";
+import { solicitarRecuperacaoSenha } from "@/lib/auth.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,6 +56,7 @@ function Login() {
   const router = useRouter();
   const [modo, setModo] = useState<"entrar" | "criar" | "recuperar">("entrar");
   const verificar = useServerFn(verificarLiberacao);
+  const recuperar = useServerFn(solicitarRecuperacaoSenha);
   const [carregando, setCarregando] = useState(false);
   // Evita envio nativo do formulário (senha na URL) antes da hidratação do React.
   const [pronto, setPronto] = useState(false);
@@ -72,18 +74,20 @@ function Login() {
         return;
       }
       setCarregando(true);
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/redefinir-senha`,
-      });
-      setCarregando(false);
-      if (error) {
-        toast.error("Não foi possível enviar o e-mail", { description: mensagemDeErro(error.message) });
-        return;
+      try {
+        await recuperar({ data: { email, origem: window.location.origin } });
+        toast.success("E-mail enviado", {
+          description:
+            "Se existir uma conta com este e-mail, o link de redefinição chegou na caixa de entrada.",
+        });
+        setModo("entrar");
+      } catch (erro) {
+        toast.error("Não foi possível enviar o e-mail", {
+          description: mensagemDeErro(erro instanceof Error ? erro.message : "Tente novamente."),
+        });
+      } finally {
+        setCarregando(false);
       }
-      toast.success("E-mail enviado", {
-        description: "Se existir uma conta com este e-mail, o link de redefinição chegou na caixa de entrada.",
-      });
-      setModo("entrar");
       return;
     }
 
