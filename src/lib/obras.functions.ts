@@ -507,6 +507,29 @@ export const criarAtualizacao = createServerFn({ method: "POST" })
     return { id: criada.id };
   });
 
+export const notificarAtualizacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ atualizacaoId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: atualizacao, error } = await context.supabase
+      .from("atualizacoes")
+      .select("id, obras(engenheiro_id)")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!atualizacao || atualizacao.obras?.engenheiro_id !== context.userId) {
+      throw new Error("Apenas o engenheiro responsável pode notificar os clientes.");
+    }
+
+    const { notificarClientesDaAtualizacao } = await import("./notificacoes.server");
+    const enviados = await notificarClientesDaAtualizacao(data.atualizacaoId);
+    return { enviados };
+  });
+
+
+
 export const excluirAtualizacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
