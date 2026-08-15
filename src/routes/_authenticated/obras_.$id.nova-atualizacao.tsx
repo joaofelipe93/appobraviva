@@ -19,6 +19,7 @@ import {
   excluirAtualizacao,
   obterObra,
   gerarResumoRelatorio,
+  notificarAtualizacao,
   processarExcel,
   registrarMidias,
   salvarEtapa,
