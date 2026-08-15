@@ -170,7 +170,7 @@ function Login() {
               : "Informe seu e-mail e enviaremos um link para criar uma nova senha."}
         </p>
 
-        <form onSubmit={enviar} className="mt-6 space-y-4">
+        <form onSubmit={enviar} method="post" className="mt-6 space-y-4">
           {modo === "criar" && (
             <>
               <p className="rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
@@ -224,7 +224,7 @@ function Login() {
           </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={carregando}>
+          <Button type="submit" className="w-full" disabled={carregando || !pronto}>
             {carregando
               ? "Aguarde..."
               : modo === "entrar"
