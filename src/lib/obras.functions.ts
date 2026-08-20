@@ -40,7 +40,7 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     if (!papel) {
       const { data: liberacao } = await supabaseAdmin
         .from("pre_cadastros")
-        .select("id, nome, papel, usado_por, email, obra_id, unidade")
+        .select("id, nome, papel, usado_por, email, telefone, obra_id, unidade")
         .eq("cpf", data.cpf)
         .maybeSingle();
 
@@ -54,24 +54,47 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       }
 
       papel = liberacao.papel;
+      telefone = liberacao.telefone ?? null;
 
       await supabaseAdmin
         .from("pre_cadastros")
         .update({ usado_em: new Date().toISOString(), usado_por: context.userId })
         .eq("id", liberacao.id);
 
-      // Vínculo automático com a obra/casa definida pelo administrador no pré-cadastro.
-      if (papel === "cliente" && liberacao.obra_id) {
-        await supabaseAdmin.from("obra_clientes").upsert(
-          {
+      // Vínculo automático com todas as casas definidas pelo administrador no pré-cadastro.
+      if (papel === "cliente") {
+        const { data: casas } = await supabaseAdmin
+          .from("pre_cadastro_unidades")
+          .select("obra_id, unidade, percentual, contrato_ok")
+          .eq("pre_cadastro_id", liberacao.id);
+
+        const vinculos = (casas ?? []).map((casa) => ({
+          obra_id: casa.obra_id,
+          cliente_id: context.userId,
+          unidade: unidadeBanco(casa.unidade),
+          percentual: casa.percentual,
+          contrato_ok: casa.contrato_ok,
+        }));
+
+        // Compatibilidade com pré-cadastros antigos (uma casa na própria linha).
+        if (vinculos.length === 0 && liberacao.obra_id) {
+          vinculos.push({
             obra_id: liberacao.obra_id,
             cliente_id: context.userId,
-            unidade: normalizarUnidade(liberacao.unidade),
-          },
-          { onConflict: "obra_id,cliente_id" },
-        );
+            unidade: unidadeBanco(liberacao.unidade),
+            percentual: null,
+            contrato_ok: false,
+          });
+        }
+
+        if (vinculos.length > 0) {
+          await supabaseAdmin
+            .from("obra_clientes")
+            .upsert(vinculos, { onConflict: "obra_id,cliente_id,unidade" });
+        }
       }
     }
+
 
     const { error: perfilErro } = await supabaseAdmin
       .from("profiles")
