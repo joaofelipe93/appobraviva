@@ -970,22 +970,30 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       observacoes: atualizacao.observacoes,
       excel_nome: atualizacao.excel_nome,
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
-      unidade: minhaUnidade,
+      unidades: minhasUnidades,
+      unidade: minhasUnidades[0] ?? null,
       excel_dados: souEngenheiro
         ? ((conteudo?.excel_dados as ExcelDados | null) ?? null)
-        : filtrarExcelPorUnidade(conteudo?.excel_dados as ExcelDados | null, minhaUnidade),
+        : filtrarExcelPorUnidades(conteudo?.excel_dados as ExcelDados | null, minhasUnidades),
       resumo_ia: (() => {
         const geral = (conteudo?.resumo_ia as ResumoIA | null) ?? null;
-        if (souEngenheiro || !minhaUnidade) return geral;
         const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
-        const chave = Object.keys(porUnidade).find(
-          (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
-        );
-        return chave ? porUnidade[chave]! : geral;
+        if (souEngenheiro || minhasUnidades.length !== 1) return geral;
+        return resumoDaUnidade(porUnidade, minhasUnidades[0]!) ?? geral;
       })(),
-      resumosUnidades: souEngenheiro
-        ? ((conteudo?.resumos_unidades as ResumosUnidades | null) ?? {})
-        : {},
+      resumosUnidades: (() => {
+        const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
+        if (souEngenheiro) return porUnidade;
+        if (minhasUnidades.length < 2) return {} as ResumosUnidades;
+        // Investidor com várias casas: um resumo por casa dele.
+        const meus: ResumosUnidades = {};
+        for (const unidade of minhasUnidades) {
+          const resumo = resumoDaUnidade(porUnidade, unidade);
+          if (resumo) meus[unidade] = resumo;
+        }
+        return meus;
+      })(),
+
 
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")
