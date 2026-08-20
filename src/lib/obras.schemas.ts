@@ -74,24 +74,37 @@ export const perfilSchema = z.object({
   cpf: cpfSchema,
 });
 
+export const telefoneSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .optional()
+  .transform((valor) => (valor && valor.length > 0 ? valor : undefined));
+
+/** Uma casa vinculada à pessoa no pré-cadastro (unidade vazia = obra inteira). */
+export const preCadastroUnidadeSchema = z.object({
+  obraId: z.string().uuid(),
+  unidade: z
+    .string()
+    .trim()
+    .max(60)
+    .default("")
+    .transform((valor) => normalizarUnidade(valor) ?? ""),
+  percentual: z.coerce.number().min(0).max(100).nullable().optional(),
+  contrato_ok: z.boolean().default(false),
+});
+
+export type PreCadastroUnidade = z.infer<typeof preCadastroUnidadeSchema>;
+
 export const preCadastroSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome").max(120),
   cpf: cpfSchema,
   email: z.string().trim().email("E-mail inválido").max(255).toLowerCase(),
   papel: z.enum(["engenheiro", "cliente"]),
-  obraId: z
-    .string()
-    .trim()
-    .uuid()
-    .optional()
-    .or(z.literal("").transform(() => undefined)),
-  unidade: z
-    .string()
-    .trim()
-    .max(60)
-    .optional()
-    .transform((valor) => (valor && valor.length > 0 ? valor : undefined)),
+  telefone: telefoneSchema,
+  unidades: z.array(preCadastroUnidadeSchema).max(40).default([]),
 });
+
 
 export const criarObraSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome da obra").max(140),
