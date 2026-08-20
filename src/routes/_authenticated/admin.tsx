@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Trash2, UserPlus } from "lucide-react";
+import { Plus, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -13,13 +13,19 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link } from "@tanstack/react-router";
 import {
+  adicionarUnidadePreCadastro,
   criarPreCadastro,
   listarObrasAdmin,
   listarPreCadastros,
   meuPerfil,
   removerPreCadastro,
+  removerUnidadePreCadastro,
 } from "@/lib/obras.functions";
-import { formatarCpf, preCadastroSchema } from "@/lib/obras.schemas";
+import { formatarCpf, normalizarUnidade, preCadastroSchema } from "@/lib/obras.schemas";
+import type { z } from "zod";
+
+type PreCadastroEntrada = z.infer<typeof preCadastroSchema>;
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -41,6 +47,15 @@ export const Route = createFileRoute("/_authenticated/admin")({
   }),
   component: Admin,
 });
+
+type ObraOpcao = { id: string; nome: string };
+
+type CasaForm = {
+  obraId: string;
+  unidade: string;
+  percentual: string;
+  contrato_ok: boolean;
+};
 
 function Admin() {
   const perfilFn = useServerFn(meuPerfil);
@@ -78,24 +93,26 @@ function AdminPainel() {
   const queryClient = useQueryClient();
   const [papel, setPapel] = useState<"engenheiro" | "cliente">("cliente");
   const [cpf, setCpf] = useState("");
-  const [obraId, setObraId] = useState("");
+  const [casas, setCasas] = useState<CasaForm[]>([]);
+  const [novaCasa, setNovaCasa] = useState<CasaForm>({
+    obraId: "",
+    unidade: "",
+    percentual: "",
+    contrato_ok: false,
+  });
 
   const lista = useQuery({ queryKey: ["pre-cadastros"], queryFn: () => listarFn({}) });
   const obras = useQuery({ queryKey: ["obras-admin"], queryFn: () => obrasFn({}) });
+  const opcoes: ObraOpcao[] = obras.data ?? [];
+  const nomeDaObra = (id: string) => opcoes.find((o) => o.id === id)?.nome ?? "Obra";
 
   const criar = useMutation({
-    mutationFn: (valores: {
-      nome: string;
-      cpf: string;
-      email: string;
-      papel: "engenheiro" | "cliente";
-      obraId?: string | undefined;
-      unidade?: string | undefined;
-    }) => criarFn({ data: valores }),
+    mutationFn: (valores: PreCadastroEntrada) => criarFn({ data: valores }),
+
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
       setCpf("");
-      setObraId("");
+      setCasas([]);
       toast.success("Pré-cadastro liberado.");
     },
     onError: (erro) => toast.error("Não foi possível liberar", { description: erro.message }),
@@ -110,6 +127,21 @@ function AdminPainel() {
     onError: (erro) => toast.error("Erro ao remover", { description: erro.message }),
   });
 
+  function adicionarCasaNaLista() {
+    if (!novaCasa.obraId) {
+      toast.error("Escolha a obra da casa.");
+      return;
+    }
+    const unidade = normalizarUnidade(novaCasa.unidade) ?? "";
+    const repetida = casas.some((c) => c.obraId === novaCasa.obraId && c.unidade === unidade);
+    if (repetida) {
+      toast.error("Esta casa já está na lista.");
+      return;
+    }
+    setCasas((atual) => [...atual, { ...novaCasa, unidade }]);
+    setNovaCasa({ obraId: novaCasa.obraId, unidade: "", percentual: "", contrato_ok: false });
+  }
+
   function enviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const form = evento.currentTarget;
@@ -118,9 +150,17 @@ function AdminPainel() {
       nome: dados.get("nome"),
       cpf: String(dados.get("cpf") ?? ""),
       email: dados.get("email"),
+      telefone: String(dados.get("telefone") ?? ""),
       papel,
-      obraId: papel === "cliente" ? obraId : "",
-      unidade: papel === "cliente" ? String(dados.get("unidade") ?? "") : "",
+      unidades:
+        papel === "cliente"
+          ? casas.map((casa) => ({
+              obraId: casa.obraId,
+              unidade: casa.unidade,
+              percentual: casa.percentual === "" ? null : Number(casa.percentual),
+              contrato_ok: casa.contrato_ok,
+            }))
+          : [],
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0]?.message ?? "Dados inválidos");
@@ -147,7 +187,7 @@ function AdminPainel() {
       titulo="Administração"
       descricao="Somente CPFs liberados aqui conseguem criar conta no ObraViva."
     >
-      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+      <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <Card className="rounded-sm border-t-4 border-t-accent">
           <CardHeader>
             <CardTitle className="font-display uppercase">Novo pré-cadastro</CardTitle>
@@ -198,39 +238,125 @@ function AdminPainel() {
                   className="rounded-sm"
                 />
               </div>
+              <div className="space-y-1">
+                <Label htmlFor="pc-telefone">Telefone (opcional)</Label>
+                <Input
+                  id="pc-telefone"
+                  name="telefone"
+                  maxLength={30}
+                  placeholder="(84) 90000-0000"
+                  className="rounded-sm"
+                />
+              </div>
+
               {papel === "cliente" && (
-                <div className="space-y-4 rounded-sm border border-dashed border-border p-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="pc-obra">Obra vinculada</Label>
-                    <select
-                      id="pc-obra"
-                      value={obraId}
-                      onChange={(e) => setObraId(e.target.value)}
-                      className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm"
-                    >
-                      <option value="">Sem vínculo (definir depois)</option>
-                      {(obras.data ?? []).map((obra) => (
-                        <option key={obra.id} value={obra.id}>
-                          {obra.nome}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="pc-unidade">Casa / unidade</Label>
-                    <Input
-                      id="pc-unidade"
-                      name="unidade"
-                      maxLength={60}
-                      placeholder="Ex.: Casa 1"
-                      className="rounded-sm"
-                    />
+                <div className="space-y-3 rounded-sm border border-dashed border-border p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-accent">
+                    Casas do investidor
+                  </p>
+
+                  {casas.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      O cliente verá somente as informações desta casa.
+                      Nenhuma casa adicionada. O cliente pode ser vinculado depois.
                     </p>
+                  )}
+                  {casas.map((casa, indice) => (
+                    <div
+                      key={`${casa.obraId}-${casa.unidade}`}
+                      className="flex items-start justify-between gap-2 rounded-sm bg-muted/40 p-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold">{casa.unidade || "Obra inteira"}</p>
+                        <p className="text-muted-foreground">{nomeDaObra(casa.obraId)}</p>
+                        <p className="text-muted-foreground">
+                          {casa.percentual ? `${casa.percentual}% da cota · ` : ""}
+                          {casa.contrato_ok ? "Contrato assinado" : "Contrato pendente"}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        aria-label="Remover casa da lista"
+                        onClick={() => setCasas((atual) => atual.filter((_, i) => i !== indice))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <div className="space-y-2 border-t border-border pt-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="pc-obra">Obra</Label>
+                      <select
+                        id="pc-obra"
+                        value={novaCasa.obraId}
+                        onChange={(e) =>
+                          setNovaCasa((atual) => ({ ...atual, obraId: e.target.value }))
+                        }
+                        className="h-10 w-full rounded-sm border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="">Selecione a obra</option>
+                        {opcoes.map((obra) => (
+                          <option key={obra.id} value={obra.id}>
+                            {obra.nome}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="pc-unidade">Casa / unidade</Label>
+                        <Input
+                          id="pc-unidade"
+                          value={novaCasa.unidade}
+                          onChange={(e) =>
+                            setNovaCasa((atual) => ({ ...atual, unidade: e.target.value }))
+                          }
+                          maxLength={60}
+                          placeholder="Ex.: Casa 1"
+                          className="rounded-sm"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="pc-percentual">% da cota</Label>
+                        <Input
+                          id="pc-percentual"
+                          value={novaCasa.percentual}
+                          onChange={(e) =>
+                            setNovaCasa((atual) => ({ ...atual, percentual: e.target.value }))
+                          }
+                          inputMode="decimal"
+                          placeholder="100"
+                          className="rounded-sm"
+                        />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={novaCasa.contrato_ok}
+                        onChange={(e) =>
+                          setNovaCasa((atual) => ({ ...atual, contrato_ok: e.target.checked }))
+                        }
+                        className="h-4 w-4 rounded-sm border-input"
+                      />
+                      Contrato assinado
+                    </label>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={adicionarCasaNaLista}
+                    >
+                      <Plus className="mr-1 h-4 w-4" />
+                      Adicionar casa
+                    </Button>
                   </div>
                 </div>
               )}
+
               <Button type="submit" className="w-full" disabled={criar.isPending}>
                 <UserPlus className="mr-1 h-4 w-4" />
                 {criar.isPending ? "Liberando..." : "Liberar acesso"}
@@ -251,49 +377,214 @@ function AdminPainel() {
               </p>
             )}
             {(lista.data ?? []).map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold">{item.nome}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatarCpf(item.cpf)} · {item.email}
-                  </p>
-                  {item.papel === "cliente" && (item.obra_nome || item.unidade) && (
-                    <p className="text-xs text-muted-foreground">
-                      {item.obra_nome ?? "Obra removida"}
-                      {item.unidade ? ` · ${item.unidade}` : ""}
+              <div key={item.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{item.nome}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatarCpf(item.cpf)} · {item.email}
+                      {item.telefone ? ` · ${item.telefone}` : ""}
                     </p>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="uppercase">
+                      {item.papel === "engenheiro" ? "Engenheiro" : "Cliente"}
+                    </Badge>
+                    <Badge
+                      className={
+                        item.usado_em
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-accent text-accent-foreground"
+                      }
+                    >
+                      {item.usado_em ? "Conta ativa" : "Aguardando cadastro"}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => remover.mutate(item.id)}
+                      aria-label={`Remover ${item.nome}`}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="uppercase">
-                    {item.papel === "engenheiro" ? "Engenheiro" : "Cliente"}
-                  </Badge>
-                  <Badge
-                    className={
-                      item.usado_em
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-accent text-accent-foreground"
+                {item.papel === "cliente" && (
+                  <CasasDoCliente
+                    preCadastroId={item.id}
+                    casas={item.unidades}
+                    obras={opcoes}
+                    onChange={() =>
+                      queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] })
                     }
-                  >
-                    {item.usado_em ? "Conta ativa" : "Aguardando cadastro"}
-                  </Badge>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remover.mutate(item.id)}
-                    aria-label={`Remover ${item.nome}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                  />
+                )}
               </div>
             ))}
           </CardContent>
         </Card>
       </div>
     </AppShell>
+  );
+}
+
+function CasasDoCliente({
+  preCadastroId,
+  casas,
+  obras,
+  onChange,
+}: {
+  preCadastroId: string;
+  casas: {
+    id: string;
+    obraId: string;
+    obraNome: string;
+    unidade: string;
+    percentual: number | null;
+    contrato_ok: boolean;
+  }[];
+  obras: ObraOpcao[];
+  onChange: () => Promise<void> | void;
+}) {
+  const adicionarFn = useServerFn(adicionarUnidadePreCadastro);
+  const removerFn = useServerFn(removerUnidadePreCadastro);
+  const [aberto, setAberto] = useState(false);
+  const [obraId, setObraId] = useState("");
+  const [unidade, setUnidade] = useState("");
+  const [percentual, setPercentual] = useState("");
+  const [contratoOk, setContratoOk] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {casas.length === 0 && (
+          <span className="text-xs text-muted-foreground">Nenhuma casa vinculada.</span>
+        )}
+        {casas.map((casa) => (
+          <span
+            key={casa.id}
+            className="flex items-center gap-1 rounded-sm bg-muted px-2 py-1 text-xs"
+          >
+            <span className="font-semibold">{casa.unidade || "Obra inteira"}</span>
+            <span className="text-muted-foreground">· {casa.obraNome}</span>
+            {casa.percentual !== null && (
+              <span className="text-muted-foreground">· {casa.percentual}%</span>
+            )}
+            <span className={casa.contrato_ok ? "text-accent" : "text-muted-foreground"}>
+              · {casa.contrato_ok ? "contrato ok" : "contrato pendente"}
+            </span>
+            {!casa.id.startsWith("legado-") && (
+              <button
+                type="button"
+                aria-label={`Remover ${casa.unidade || "vínculo"}`}
+                className="text-muted-foreground hover:text-destructive"
+                onClick={async () => {
+                  try {
+                    await removerFn({ data: { id: casa.id } });
+                    await onChange();
+                  } catch (erro) {
+                    toast.error("Não foi possível remover", {
+                      description: erro instanceof Error ? erro.message : undefined,
+                    });
+                  }
+                }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </span>
+        ))}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs"
+          onClick={() => setAberto((valor) => !valor)}
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          Casa
+        </Button>
+      </div>
+
+      {aberto && (
+        <div className="grid gap-2 rounded-sm border border-dashed border-border p-2 sm:grid-cols-[1fr_140px_100px_auto]">
+          <select
+            value={obraId}
+            onChange={(e) => setObraId(e.target.value)}
+            aria-label="Obra"
+            className="h-9 rounded-sm border border-input bg-background px-2 text-sm"
+          >
+            <option value="">Obra...</option>
+            {obras.map((obra) => (
+              <option key={obra.id} value={obra.id}>
+                {obra.nome}
+              </option>
+            ))}
+          </select>
+          <Input
+            value={unidade}
+            onChange={(e) => setUnidade(e.target.value)}
+            placeholder="Casa 1"
+            aria-label="Casa / unidade"
+            className="h-9 rounded-sm"
+          />
+          <Input
+            value={percentual}
+            onChange={(e) => setPercentual(e.target.value)}
+            placeholder="% cota"
+            aria-label="Percentual da cota"
+            className="h-9 rounded-sm"
+          />
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={contratoOk}
+                onChange={(e) => setContratoOk(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Contrato
+            </label>
+            <Button
+              type="button"
+              size="sm"
+              disabled={enviando}
+              onClick={async () => {
+                if (!obraId) {
+                  toast.error("Escolha a obra.");
+                  return;
+                }
+                setEnviando(true);
+                try {
+                  await adicionarFn({
+                    data: {
+                      preCadastroId,
+                      obraId,
+                      unidade,
+                      percentual: percentual === "" ? null : Number(percentual),
+                      contrato_ok: contratoOk,
+                    },
+                  });
+                  setUnidade("");
+                  setPercentual("");
+                  setContratoOk(false);
+                  await onChange();
+                  toast.success("Casa vinculada.");
+                } catch (erro) {
+                  toast.error("Não foi possível vincular", {
+                    description: erro instanceof Error ? erro.message : undefined,
+                  });
+                } finally {
+                  setEnviando(false);
+                }
+              }}
+            >
+              Salvar
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

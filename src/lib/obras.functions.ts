@@ -9,13 +9,18 @@ import {
   novaEtapaSchema,
   perfilSchema,
   preCadastroSchema,
+  preCadastroUnidadeSchema,
   vincularClienteSchema,
   ETAPAS_PADRAO,
   agruparExcelPorUnidade,
-  filtrarExcelPorUnidade,
+  filtrarExcelPorUnidades,
   normalizarUnidade,
+  resumoDaUnidade,
+  unidadeBanco,
+  unidadesDoCliente,
 } from "./obras.schemas";
 import type { ExcelDados, ResumoIA, ResumosUnidades } from "./obras.schemas";
+
 import { z } from "zod";
 
 export const registrarPerfil = createServerFn({ method: "POST" })
@@ -31,11 +36,13 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
 
     let papel = papeis?.[0]?.role ?? null;
+    let telefone: string | null = null;
+
 
     if (!papel) {
       const { data: liberacao } = await supabaseAdmin
         .from("pre_cadastros")
-        .select("id, nome, papel, usado_por, email, obra_id, unidade")
+        .select("id, nome, papel, usado_por, email, telefone, obra_id, unidade")
         .eq("cpf", data.cpf)
         .maybeSingle();
 
@@ -49,31 +56,55 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       }
 
       papel = liberacao.papel;
+      telefone = liberacao.telefone ?? null;
 
       await supabaseAdmin
         .from("pre_cadastros")
         .update({ usado_em: new Date().toISOString(), usado_por: context.userId })
         .eq("id", liberacao.id);
 
-      // Vínculo automático com a obra/casa definida pelo administrador no pré-cadastro.
-      if (papel === "cliente" && liberacao.obra_id) {
-        await supabaseAdmin.from("obra_clientes").upsert(
-          {
+      // Vínculo automático com todas as casas definidas pelo administrador no pré-cadastro.
+      if (papel === "cliente") {
+        const { data: casas } = await supabaseAdmin
+          .from("pre_cadastro_unidades")
+          .select("obra_id, unidade, percentual, contrato_ok")
+          .eq("pre_cadastro_id", liberacao.id);
+
+        const vinculos = (casas ?? []).map((casa) => ({
+          obra_id: casa.obra_id,
+          cliente_id: context.userId,
+          unidade: unidadeBanco(casa.unidade),
+          percentual: casa.percentual,
+          contrato_ok: casa.contrato_ok,
+        }));
+
+        // Compatibilidade com pré-cadastros antigos (uma casa na própria linha).
+        if (vinculos.length === 0 && liberacao.obra_id) {
+          vinculos.push({
             obra_id: liberacao.obra_id,
             cliente_id: context.userId,
-            unidade: normalizarUnidade(liberacao.unidade),
-          },
-          { onConflict: "obra_id,cliente_id" },
-        );
+            unidade: unidadeBanco(liberacao.unidade),
+            percentual: null,
+            contrato_ok: false,
+          });
+        }
+
+        if (vinculos.length > 0) {
+          await supabaseAdmin
+            .from("obra_clientes")
+            .upsert(vinculos, { onConflict: "obra_id,cliente_id,unidade" });
+        }
       }
     }
+
 
     const { error: perfilErro } = await supabaseAdmin
       .from("profiles")
       .upsert(
-        { id: context.userId, nome: data.nome, email, cpf: data.cpf },
+        { id: context.userId, nome: data.nome, email, cpf: data.cpf, ...(telefone ? { telefone } : {}) },
         { onConflict: "id" },
       );
+
     if (perfilErro) {
       if (perfilErro.code === "23505" || perfilErro.message.includes("duplicate")) {
         throw new Error("Este CPF já está cadastrado em outra conta.");
@@ -122,20 +153,52 @@ export const listarPreCadastros = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await context.supabase
       .from("pre_cadastros")
-      .select("id, nome, cpf, email, papel, usado_em, created_at, obra_id, unidade")
+      .select("id, nome, cpf, email, telefone, papel, usado_em, created_at, obra_id, unidade")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const lista = data ?? [];
-    const ids = [...new Set(lista.map((i) => i.obra_id).filter(Boolean))] as string[];
-    let nomes = new Map<string, string>();
-    if (ids.length > 0) {
-      const { data: obras } = await supabaseAdmin.from("obras").select("id, nome").in("id", ids);
-      nomes = new Map((obras ?? []).map((o) => [o.id, o.nome]));
-    }
-    return lista.map((item) => ({
-      ...item,
-      obra_nome: item.obra_id ? (nomes.get(item.obra_id) ?? null) : null,
-    }));
+
+    const { data: casas } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .select("id, pre_cadastro_id, obra_id, unidade, percentual, contrato_ok");
+
+    const { data: obras } = await supabaseAdmin
+      .from("obras")
+      .select("id, nome")
+      .order("nome", { ascending: true });
+    const nomes = new Map((obras ?? []).map((o) => [o.id, o.nome]));
+
+    return lista.map((item) => {
+      const minhas = (casas ?? [])
+        .filter((c) => c.pre_cadastro_id === item.id)
+        .map((c) => ({
+          id: c.id,
+          obraId: c.obra_id,
+          obraNome: nomes.get(c.obra_id) ?? "Obra removida",
+          unidade: c.unidade,
+          percentual: c.percentual,
+          contrato_ok: c.contrato_ok,
+        }))
+        .sort(
+          (a, b) =>
+            a.obraNome.localeCompare(b.obraNome, "pt-BR") ||
+            a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }),
+        );
+
+      // Pré-cadastros antigos guardavam uma única casa na própria linha.
+      if (minhas.length === 0 && item.obra_id) {
+        minhas.push({
+          id: `legado-${item.id}`,
+          obraId: item.obra_id,
+          obraNome: nomes.get(item.obra_id) ?? "Obra removida",
+          unidade: item.unidade ?? "",
+          percentual: null,
+          contrato_ok: false,
+        });
+      }
+
+      return { ...item, unidades: minhas };
+    });
   });
 
 /** Todas as obras cadastradas, para o admin vincular o cliente já no pré-cadastro. */
@@ -160,23 +223,118 @@ export const criarPreCadastro = createServerFn({ method: "POST" })
     const { garantirAdmin } = await import("./admin.server");
     await garantirAdmin(context.supabase, context.userId);
     const cliente = data.papel === "cliente";
-    const { error } = await context.supabase.from("pre_cadastros").insert({
-      nome: data.nome,
-      cpf: data.cpf,
-      email: data.email,
-      papel: data.papel,
-      criado_por: context.userId,
-      obra_id: cliente ? (data.obraId ?? null) : null,
-      unidade: cliente ? (normalizarUnidade(data.unidade) ?? null) : null,
-    });
+    const { data: criado, error } = await context.supabase
+      .from("pre_cadastros")
+      .insert({
+        nome: data.nome,
+        cpf: data.cpf,
+        email: data.email,
+        papel: data.papel,
+        telefone: data.telefone ?? null,
+        criado_por: context.userId,
+      })
+      .select("id")
+      .single();
     if (error) {
       if (error.code === "23505" || error.message.includes("duplicate")) {
         throw new Error("Já existe um pré-cadastro com este CPF.");
       }
       throw new Error(error.message);
     }
+
+    if (cliente && data.unidades.length > 0) {
+      const { error: erroCasas } = await context.supabase.from("pre_cadastro_unidades").insert(
+        data.unidades.map((casa) => ({
+          pre_cadastro_id: criado.id,
+          obra_id: casa.obraId,
+          unidade: casa.unidade,
+          percentual: casa.percentual ?? null,
+          contrato_ok: casa.contrato_ok,
+        })),
+      );
+      if (erroCasas) throw new Error(erroCasas.message);
+    }
+
+    return { id: criado.id };
+  });
+
+/** Acrescenta uma casa a uma pessoa já pré-cadastrada. */
+export const adicionarUnidadePreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    preCadastroUnidadeSchema
+      .extend({ preCadastroId: z.string().uuid() })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.from("pre_cadastro_unidades").upsert(
+      {
+        pre_cadastro_id: data.preCadastroId,
+        obra_id: data.obraId,
+        unidade: data.unidade,
+        percentual: data.percentual ?? null,
+        contrato_ok: data.contrato_ok,
+      },
+      { onConflict: "pre_cadastro_id,obra_id,unidade" },
+    );
+    if (error) throw new Error(error.message);
+
+    // Se a pessoa já criou a conta, o vínculo vale de imediato.
+    const { data: pre } = await context.supabase
+      .from("pre_cadastros")
+      .select("usado_por")
+      .eq("id", data.preCadastroId)
+      .maybeSingle();
+    if (pre?.usado_por) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("obra_clientes").upsert(
+        {
+          obra_id: data.obraId,
+          cliente_id: pre.usado_por,
+          unidade: data.unidade,
+          percentual: data.percentual ?? null,
+          contrato_ok: data.contrato_ok,
+        },
+        { onConflict: "obra_id,cliente_id,unidade" },
+      );
+    }
     return { ok: true };
   });
+
+export const removerUnidadePreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+
+    const { data: casa } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .select("obra_id, unidade, pre_cadastros(usado_por)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    const { error } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    const clienteId = casa?.pre_cadastros?.usado_por ?? null;
+    if (casa && clienteId) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("obra_clientes")
+        .delete()
+        .eq("obra_id", casa.obra_id)
+        .eq("cliente_id", clienteId)
+        .eq("unidade", casa.unidade);
+    }
+    return { ok: true };
+  });
+
 
 export const removerPreCadastro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -275,28 +433,51 @@ export const obterObra = createServerFn({ method: "GET" })
           .order("created_at", { ascending: false }),
         context.supabase
           .from("obra_clientes")
-          .select("cliente_id, unidade")
+          .select("cliente_id, unidade, percentual, contrato_ok")
           .eq("obra_id", data.obraId),
+
         context.supabase.from("leituras").select("atualizacao_id").eq("user_id", context.userId),
       ]);
 
-    const clienteIds = (vinculos ?? []).map((v) => v.cliente_id);
+    const clienteIds = [...new Set((vinculos ?? []).map((v) => v.cliente_id))];
     let clientes: {
       id: string;
       nome: string;
       email: string;
       cpf: string | null;
       unidade: string | null;
+      unidadeChave: string;
+      percentual: number | null;
+      contrato_ok: boolean;
     }[] = [];
+
     if (clienteIds.length > 0) {
       const { data: perfis } = await context.supabase
         .from("profiles")
         .select("id, nome, email, cpf")
         .in("id", clienteIds);
-      clientes = (perfis ?? []).map((perfil) => ({
-        ...perfil,
-        unidade: (vinculos ?? []).find((v) => v.cliente_id === perfil.id)?.unidade ?? null,
-      }));
+      const porId = new Map((perfis ?? []).map((p) => [p.id, p]));
+      // Uma linha por casa: o mesmo cliente pode ter várias casas na obra.
+      clientes = (vinculos ?? [])
+        .map((vinculo) => {
+          const perfil = porId.get(vinculo.cliente_id);
+          return {
+            id: vinculo.cliente_id,
+            nome: perfil?.nome ?? "",
+            email: perfil?.email ?? "",
+            cpf: perfil?.cpf ?? null,
+            unidade: normalizarUnidade(vinculo.unidade),
+            unidadeChave: vinculo.unidade ?? "",
+
+            percentual: vinculo.percentual,
+            contrato_ok: vinculo.contrato_ok,
+          };
+        })
+        .sort(
+          (a, b) =>
+            a.nome.localeCompare(b.nome, "pt-BR") ||
+            (a.unidade ?? "").localeCompare(b.unidade ?? "", "pt-BR", { numeric: true }),
+        );
     }
 
     const unidades = Array.from(
@@ -306,6 +487,7 @@ export const obterObra = createServerFn({ method: "GET" })
           .filter((u): u is string => !!u),
       ),
     ).sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+
 
     const lidas = new Set((leituras ?? []).map((l) => l.atualizacao_id));
     const souEngenheiro = obra.engenheiro_id === context.userId;
@@ -418,12 +600,12 @@ export const vincularCliente = createServerFn({ method: "POST" })
       throw new Error("Esta conta não é uma conta de cliente.");
     }
 
-    const unidade = normalizarUnidade(data.unidade);
+    const unidade = unidadeBanco(data.unidade);
     const { error } = await context.supabase
       .from("obra_clientes")
       .upsert(
         { obra_id: data.obraId, cliente_id: perfil.id, unidade },
-        { onConflict: "obra_id,cliente_id" },
+        { onConflict: "obra_id,cliente_id,unidade" },
       );
     if (error) throw new Error(error.message);
 
@@ -433,17 +615,26 @@ export const vincularCliente = createServerFn({ method: "POST" })
 export const desvincularCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ obraId: z.string().uuid(), clienteId: z.string().uuid() }).parse(input),
+    z
+      .object({
+        obraId: z.string().uuid(),
+        clienteId: z.string().uuid(),
+        unidade: z.string().max(60).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    let consulta = context.supabase
       .from("obra_clientes")
       .delete()
       .eq("obra_id", data.obraId)
       .eq("cliente_id", data.clienteId);
+    if (data.unidade !== undefined) consulta = consulta.eq("unidade", data.unidade);
+    const { error } = await consulta;
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const salvarEtapa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -739,16 +930,16 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
 
     const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
 
-    let minhaUnidade: string | null = null;
+    let minhasUnidades: string[] = [];
     if (!souEngenheiro) {
-      const { data: vinculo } = await context.supabase
+      const { data: vinculos } = await context.supabase
         .from("obra_clientes")
         .select("unidade")
         .eq("obra_id", atualizacao.obra_id)
-        .eq("cliente_id", context.userId)
-        .maybeSingle();
-      minhaUnidade = normalizarUnidade(vinculo?.unidade);
+        .eq("cliente_id", context.userId);
+      minhasUnidades = unidadesDoCliente((vinculos ?? []).map((v) => v.unidade));
     }
+
 
     if (!souEngenheiro) {
       await context.supabase
@@ -783,22 +974,30 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       observacoes: atualizacao.observacoes,
       excel_nome: atualizacao.excel_nome,
       excelUrl: atualizacao.excel_path ? (urls[atualizacao.excel_path] ?? null) : null,
-      unidade: minhaUnidade,
+      unidades: minhasUnidades,
+      unidade: minhasUnidades[0] ?? null,
       excel_dados: souEngenheiro
         ? ((conteudo?.excel_dados as ExcelDados | null) ?? null)
-        : filtrarExcelPorUnidade(conteudo?.excel_dados as ExcelDados | null, minhaUnidade),
+        : filtrarExcelPorUnidades(conteudo?.excel_dados as ExcelDados | null, minhasUnidades),
       resumo_ia: (() => {
         const geral = (conteudo?.resumo_ia as ResumoIA | null) ?? null;
-        if (souEngenheiro || !minhaUnidade) return geral;
         const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
-        const chave = Object.keys(porUnidade).find(
-          (k) => k.toLowerCase() === minhaUnidade!.toLowerCase(),
-        );
-        return chave ? porUnidade[chave]! : geral;
+        if (souEngenheiro || minhasUnidades.length !== 1) return geral;
+        return resumoDaUnidade(porUnidade, minhasUnidades[0]!) ?? geral;
       })(),
-      resumosUnidades: souEngenheiro
-        ? ((conteudo?.resumos_unidades as ResumosUnidades | null) ?? {})
-        : {},
+      resumosUnidades: (() => {
+        const porUnidade = (conteudo?.resumos_unidades as ResumosUnidades | null) ?? {};
+        if (souEngenheiro) return porUnidade;
+        if (minhasUnidades.length < 2) return {} as ResumosUnidades;
+        // Investidor com várias casas: um resumo por casa dele.
+        const meus: ResumosUnidades = {};
+        for (const unidade of minhasUnidades) {
+          const resumo = resumoDaUnidade(porUnidade, unidade);
+          if (resumo) meus[unidade] = resumo;
+        }
+        return meus;
+      })(),
+
 
       fotos: (atualizacao.midias ?? [])
         .filter((m) => m.tipo === "foto")

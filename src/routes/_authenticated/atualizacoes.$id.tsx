@@ -157,9 +157,12 @@ function AtualizacaoPage() {
                   Responsável técnico: {dados.responsavelNome}
                 </p>
               )}
-              {dados.unidade && (
-                <p className="text-xs font-semibold uppercase text-accent">{dados.unidade}</p>
+              {dados.unidades.length > 0 && (
+                <p className="text-xs font-semibold uppercase text-accent">
+                  {dados.unidades.join(" · ")}
+                </p>
               )}
+
             </CardHeader>
             <CardContent className="space-y-3">
               {dados.resumo_ia ? (
@@ -217,14 +220,17 @@ function AtualizacaoPage() {
           </Card>
         )}
 
-        {dados.souEngenheiro && Object.keys(dados.resumosUnidades).length > 0 && (
+        {Object.keys(dados.resumosUnidades).length > 0 && (
           <Card className="rounded-sm">
             <CardHeader className="pb-2">
               <CardTitle className="font-display uppercase">Resumos por casa</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Cada cliente vê apenas o resumo da casa vinculada a ele.
+                {dados.souEngenheiro
+                  ? "Cada cliente vê apenas o resumo das casas vinculadas a ele."
+                  : "Um resumo para cada casa vinculada ao seu cadastro."}
               </p>
             </CardHeader>
+
             <CardContent className="space-y-4">
               {Object.entries(dados.resumosUnidades).map(([unidade, resumo]) => (
                 <div key={unidade} className="space-y-2 rounded-sm border border-border p-3">

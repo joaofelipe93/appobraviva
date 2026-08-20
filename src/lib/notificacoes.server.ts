@@ -1,7 +1,7 @@
 import { render } from "@react-email/render";
 import { NovaAtualizacaoEmail } from "./email-templates/nova-atualizacao";
 import { enviarEmail } from "./resend.server";
-import { normalizarUnidade } from "./obras.schemas";
+import { normalizarUnidade, resumoDaUnidade } from "./obras.schemas";
 import type { ResumoIA, ResumosUnidades } from "./obras.schemas";
 
 function urlBase(): string {
@@ -33,13 +33,19 @@ export async function notificarClientesDaAtualizacao(atualizacaoId: string): Pro
     .eq("obra_id", atualizacao.obra_id);
   if (!vinculos || vinculos.length === 0) return 0;
 
+  // Um e-mail por investidor, com todas as casas dele nesta obra.
+  const casasPorCliente = new Map<string, string[]>();
+  for (const vinculo of vinculos) {
+    const unidade = normalizarUnidade(vinculo.unidade);
+    const atual = casasPorCliente.get(vinculo.cliente_id) ?? [];
+    if (unidade && !atual.includes(unidade)) atual.push(unidade);
+    casasPorCliente.set(vinculo.cliente_id, atual);
+  }
+
   const { data: perfis } = await supabaseAdmin
     .from("profiles")
     .select("id, email")
-    .in(
-      "id",
-      vinculos.map((v) => v.cliente_id),
-    );
+    .in("id", [...casasPorCliente.keys()]);
   const emails = new Map((perfis ?? []).map((p) => [p.id, p.email]));
 
   const resumoGeral = (atualizacao.resumo_ia as ResumoIA | null) ?? null;
@@ -48,27 +54,33 @@ export async function notificarClientesDaAtualizacao(atualizacaoId: string): Pro
   const url = `${urlBase()}/atualizacoes/${atualizacaoId}`;
 
   let enviados = 0;
-  for (const vinculo of vinculos) {
-    const email = emails.get(vinculo.cliente_id);
+  for (const [clienteId, unidades] of casasPorCliente) {
+    const email = emails.get(clienteId);
     if (!email) continue;
 
-    const unidade = normalizarUnidade(vinculo.unidade ?? undefined);
-    const resumo = (unidade ? resumosUnidades[unidade] : null) ?? resumoGeral;
-    const destaque = resumo?.titulo ?? undefined;
+    const casas = unidades
+      .sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }))
+      .map((unidade) => ({
+        unidade,
+        destaque: resumoDaUnidade(resumosUnidades, unidade)?.titulo ?? undefined,
+      }));
 
+    const uma = casas.length === 1 ? casas[0]! : null;
     const html = await render(
       NovaAtualizacaoEmail({
         obraNome,
         dataVisita: dataBR(atualizacao.data_visita),
-        unidade: unidade ?? undefined,
-        destaque,
+        unidade: uma?.unidade,
+        destaque: uma?.destaque ?? resumoGeral?.titulo ?? undefined,
+        casas: casas.length > 1 ? casas : undefined,
         url,
       }),
     );
 
+    const sufixo = uma ? ` (${uma.unidade})` : casas.length > 1 ? ` (${casas.length} casas)` : "";
     const ok = await enviarEmail({
       to: email,
-      subject: `Nova atualização — ${obraNome}${unidade ? ` (${unidade})` : ""}`,
+      subject: `Nova atualização — ${obraNome}${sufixo}`,
       html,
     });
     if (ok) enviados += 1;
@@ -76,3 +88,4 @@ export async function notificarClientesDaAtualizacao(atualizacaoId: string): Pro
 
   return enviados;
 }
+

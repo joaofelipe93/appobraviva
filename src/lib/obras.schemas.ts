@@ -74,24 +74,37 @@ export const perfilSchema = z.object({
   cpf: cpfSchema,
 });
 
+export const telefoneSchema = z
+  .string()
+  .trim()
+  .max(30)
+  .optional()
+  .transform((valor) => (valor && valor.length > 0 ? valor : undefined));
+
+/** Uma casa vinculada à pessoa no pré-cadastro (unidade vazia = obra inteira). */
+export const preCadastroUnidadeSchema = z.object({
+  obraId: z.string().uuid(),
+  unidade: z
+    .string()
+    .trim()
+    .max(60)
+    .default("")
+    .transform((valor) => normalizarUnidade(valor) ?? ""),
+  percentual: z.coerce.number().min(0).max(100).nullable().optional(),
+  contrato_ok: z.boolean().default(false),
+});
+
+export type PreCadastroUnidade = z.infer<typeof preCadastroUnidadeSchema>;
+
 export const preCadastroSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome").max(120),
   cpf: cpfSchema,
   email: z.string().trim().email("E-mail inválido").max(255).toLowerCase(),
   papel: z.enum(["engenheiro", "cliente"]),
-  obraId: z
-    .string()
-    .trim()
-    .uuid()
-    .optional()
-    .or(z.literal("").transform(() => undefined)),
-  unidade: z
-    .string()
-    .trim()
-    .max(60)
-    .optional()
-    .transform((valor) => (valor && valor.length > 0 ? valor : undefined)),
+  telefone: telefoneSchema,
+  unidades: z.array(preCadastroUnidadeSchema).max(40).default([]),
 });
+
 
 export const criarObraSchema = z.object({
   nome: z.string().trim().min(2, "Informe o nome da obra").max(140),
@@ -233,4 +246,45 @@ export function agruparExcelPorUnidade(dados: ExcelDados): Map<string, ExcelDado
     for (const grupo of grupos.values()) grupo.linhas = [...gerais, ...grupo.linhas];
   }
   return grupos;
+}
+
+/** Valor guardado no banco para a casa (vazio = obra inteira). */
+export function unidadeBanco(valor: string | null | undefined): string {
+  return normalizarUnidade(valor) ?? "";
+}
+
+/** Casas do cliente, ignorando vazios. Lista vazia = acesso à obra inteira. */
+export function unidadesDoCliente(valores: (string | null | undefined)[]): string[] {
+  const conjunto = new Set<string>();
+  for (const valor of valores) {
+    const unidade = normalizarUnidade(valor);
+    if (!unidade) return [];
+    conjunto.add(unidade);
+  }
+  return [...conjunto].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+}
+
+/** Mantém as linhas das casas informadas (linhas sem casa detectada são gerais). */
+export function filtrarExcelPorUnidades(
+  dados: ExcelDados | null,
+  unidades: string[],
+): ExcelDados | null {
+  if (!dados) return null;
+  if (unidades.length === 0) return dados;
+  const alvos = unidades.map((u) => u.toLowerCase());
+  const linhas = dados.linhas.filter((linha) => {
+    const daLinha = detectarUnidadeDaLinha(linha);
+    return !daLinha || alvos.includes(daLinha.toLowerCase());
+  });
+  return { ...dados, linhas };
+}
+
+/** Resumo guardado para a casa informada (comparação sem diferenciar maiúsculas). */
+export function resumoDaUnidade(
+  resumos: ResumosUnidades | null | undefined,
+  unidade: string,
+): ResumoIA | null {
+  if (!resumos) return null;
+  const chave = Object.keys(resumos).find((k) => k.toLowerCase() === unidade.toLowerCase());
+  return chave ? (resumos[chave] ?? null) : null;
 }
