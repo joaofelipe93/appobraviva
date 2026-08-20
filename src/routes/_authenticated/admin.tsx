@@ -103,8 +103,8 @@ function AdminPainel() {
   const nomeDaObra = (id: string) => opcoes.find((o) => o.id === id)?.nome ?? "Obra";
 
   const criar = useMutation({
-    mutationFn: (valores: Parameters<typeof criarFn>[0] extends { data: infer D } ? D : never) =>
-      criarFn({ data: valores }),
+    mutationFn: (valores: PreCadastroEntrada) => criarFn({ data: valores }),
+
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
       setCpf("");
