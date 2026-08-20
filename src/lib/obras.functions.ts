@@ -153,20 +153,52 @@ export const listarPreCadastros = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await context.supabase
       .from("pre_cadastros")
-      .select("id, nome, cpf, email, papel, usado_em, created_at, obra_id, unidade")
+      .select("id, nome, cpf, email, telefone, papel, usado_em, created_at, obra_id, unidade")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     const lista = data ?? [];
-    const ids = [...new Set(lista.map((i) => i.obra_id).filter(Boolean))] as string[];
-    let nomes = new Map<string, string>();
-    if (ids.length > 0) {
-      const { data: obras } = await supabaseAdmin.from("obras").select("id, nome").in("id", ids);
-      nomes = new Map((obras ?? []).map((o) => [o.id, o.nome]));
-    }
-    return lista.map((item) => ({
-      ...item,
-      obra_nome: item.obra_id ? (nomes.get(item.obra_id) ?? null) : null,
-    }));
+
+    const { data: casas } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .select("id, pre_cadastro_id, obra_id, unidade, percentual, contrato_ok");
+
+    const { data: obras } = await supabaseAdmin
+      .from("obras")
+      .select("id, nome")
+      .order("nome", { ascending: true });
+    const nomes = new Map((obras ?? []).map((o) => [o.id, o.nome]));
+
+    return lista.map((item) => {
+      const minhas = (casas ?? [])
+        .filter((c) => c.pre_cadastro_id === item.id)
+        .map((c) => ({
+          id: c.id,
+          obraId: c.obra_id,
+          obraNome: nomes.get(c.obra_id) ?? "Obra removida",
+          unidade: c.unidade,
+          percentual: c.percentual,
+          contrato_ok: c.contrato_ok,
+        }))
+        .sort(
+          (a, b) =>
+            a.obraNome.localeCompare(b.obraNome, "pt-BR") ||
+            a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }),
+        );
+
+      // Pré-cadastros antigos guardavam uma única casa na própria linha.
+      if (minhas.length === 0 && item.obra_id) {
+        minhas.push({
+          id: `legado-${item.id}`,
+          obraId: item.obra_id,
+          obraNome: nomes.get(item.obra_id) ?? "Obra removida",
+          unidade: item.unidade ?? "",
+          percentual: null,
+          contrato_ok: false,
+        });
+      }
+
+      return { ...item, unidades: minhas };
+    });
   });
 
 /** Todas as obras cadastradas, para o admin vincular o cliente já no pré-cadastro. */
@@ -191,23 +223,118 @@ export const criarPreCadastro = createServerFn({ method: "POST" })
     const { garantirAdmin } = await import("./admin.server");
     await garantirAdmin(context.supabase, context.userId);
     const cliente = data.papel === "cliente";
-    const { error } = await context.supabase.from("pre_cadastros").insert({
-      nome: data.nome,
-      cpf: data.cpf,
-      email: data.email,
-      papel: data.papel,
-      criado_por: context.userId,
-      obra_id: cliente ? (data.obraId ?? null) : null,
-      unidade: cliente ? (normalizarUnidade(data.unidade) ?? null) : null,
-    });
+    const { data: criado, error } = await context.supabase
+      .from("pre_cadastros")
+      .insert({
+        nome: data.nome,
+        cpf: data.cpf,
+        email: data.email,
+        papel: data.papel,
+        telefone: data.telefone ?? null,
+        criado_por: context.userId,
+      })
+      .select("id")
+      .single();
     if (error) {
       if (error.code === "23505" || error.message.includes("duplicate")) {
         throw new Error("Já existe um pré-cadastro com este CPF.");
       }
       throw new Error(error.message);
     }
+
+    if (cliente && data.unidades.length > 0) {
+      const { error: erroCasas } = await context.supabase.from("pre_cadastro_unidades").insert(
+        data.unidades.map((casa) => ({
+          pre_cadastro_id: criado.id,
+          obra_id: casa.obraId,
+          unidade: casa.unidade,
+          percentual: casa.percentual ?? null,
+          contrato_ok: casa.contrato_ok,
+        })),
+      );
+      if (erroCasas) throw new Error(erroCasas.message);
+    }
+
+    return { id: criado.id };
+  });
+
+/** Acrescenta uma casa a uma pessoa já pré-cadastrada. */
+export const adicionarUnidadePreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    preCadastroUnidadeSchema
+      .extend({ preCadastroId: z.string().uuid() })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+    const { error } = await context.supabase.from("pre_cadastro_unidades").upsert(
+      {
+        pre_cadastro_id: data.preCadastroId,
+        obra_id: data.obraId,
+        unidade: data.unidade,
+        percentual: data.percentual ?? null,
+        contrato_ok: data.contrato_ok,
+      },
+      { onConflict: "pre_cadastro_id,obra_id,unidade" },
+    );
+    if (error) throw new Error(error.message);
+
+    // Se a pessoa já criou a conta, o vínculo vale de imediato.
+    const { data: pre } = await context.supabase
+      .from("pre_cadastros")
+      .select("usado_por")
+      .eq("id", data.preCadastroId)
+      .maybeSingle();
+    if (pre?.usado_por) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("obra_clientes").upsert(
+        {
+          obra_id: data.obraId,
+          cliente_id: pre.usado_por,
+          unidade: data.unidade,
+          percentual: data.percentual ?? null,
+          contrato_ok: data.contrato_ok,
+        },
+        { onConflict: "obra_id,cliente_id,unidade" },
+      );
+    }
     return { ok: true };
   });
+
+export const removerUnidadePreCadastro = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+
+    const { data: casa } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .select("obra_id, unidade, pre_cadastros(usado_por)")
+      .eq("id", data.id)
+      .maybeSingle();
+
+    const { error } = await context.supabase
+      .from("pre_cadastro_unidades")
+      .delete()
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+
+    const clienteId = casa?.pre_cadastros?.usado_por ?? null;
+    if (casa && clienteId) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin
+        .from("obra_clientes")
+        .delete()
+        .eq("obra_id", casa.obra_id)
+        .eq("cliente_id", clienteId)
+        .eq("unidade", casa.unidade);
+    }
+    return { ok: true };
+  });
+
 
 export const removerPreCadastro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
