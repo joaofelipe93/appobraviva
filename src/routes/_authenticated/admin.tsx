@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { Plus, Trash2, UserPlus, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,14 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 type ObraOpcao = { id: string; nome: string };
+
+function semAcento(texto: string) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 type CasaForm = {
   obraId: string;
