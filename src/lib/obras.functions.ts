@@ -36,6 +36,8 @@ export const registrarPerfil = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
 
     let papel = papeis?.[0]?.role ?? null;
+    let telefone: string | null = null;
+
 
     if (!papel) {
       const { data: liberacao } = await supabaseAdmin
