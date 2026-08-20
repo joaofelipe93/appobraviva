@@ -101,9 +101,10 @@ export const registrarPerfil = createServerFn({ method: "POST" })
     const { error: perfilErro } = await supabaseAdmin
       .from("profiles")
       .upsert(
-        { id: context.userId, nome: data.nome, email, cpf: data.cpf },
+        { id: context.userId, nome: data.nome, email, cpf: data.cpf, ...(telefone ? { telefone } : {}) },
         { onConflict: "id" },
       );
+
     if (perfilErro) {
       if (perfilErro.code === "23505" || perfilErro.message.includes("duplicate")) {
         throw new Error("Este CPF já está cadastrado em outra conta.");
