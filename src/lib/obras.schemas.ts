@@ -288,3 +288,76 @@ export function resumoDaUnidade(
   const chave = Object.keys(resumos).find((k) => k.toLowerCase() === unidade.toLowerCase());
   return chave ? (resumos[chave] ?? null) : null;
 }
+
+// ============ Importação de investidores (Excel) ============
+
+export const importarInvestidoresSchema = z.object({
+  /** Conteúdo do arquivo .xlsx em base64 (data URL ou base64 puro). */
+  arquivo: z.string().min(10, "Envie o arquivo da planilha."),
+  nome: z.string().trim().max(240).default("planilha.xlsx"),
+});
+
+export type RelatorioImportacao = {
+  totalLinhas: number;
+  importados: number;
+  atualizados: number;
+  unidadesVinculadas: number;
+  ativosVinculados: number;
+  erros: { linha: number; nome: string; motivo: string }[];
+  obrasNaoEncontradas: { chave: string; quantidade: number }[];
+};
+
+/** Obra usada para casar linhas da planilha com obras já cadastradas. */
+export type ObraParaMatch = { id: string; nome: string; endereco?: string | null };
+
+const STOPWORDS_CHAVE = new Set([
+  "de", "da", "do", "das", "dos", "e", "em", "na", "no", "lote", "quadra",
+  "n", "sn", "rn", "br", "bloco", "torre",
+]);
+
+/** Tokens normalizados (sem acento, minúsculos, sem stopwords) de um texto composto. */
+export function tokensChave(texto: string): string[] {
+  const limpo = (texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  const unicos = new Set<string>();
+  for (const t of limpo.match(/[a-z0-9]+/g) ?? []) {
+    if (t.length > 0 && !STOPWORDS_CHAVE.has(t)) unicos.add(t);
+  }
+  return [...unicos];
+}
+
+/**
+ * Encontra a obra que melhor casa com os tokens da linha da planilha.
+ * Exige pelo menos 2 tokens em comum e que o vencedor vença o 2º colocado
+ * (evita correspondências ambíguas).
+ */
+export function melhorObraParaLinha(
+  linhaTokens: string[],
+  obras: ObraParaMatch[],
+): { id: string; nome: string } | null {
+  let melhorId: string | null = null;
+  let melhorNome = "";
+  let melhorPontos = 0;
+  let segundoPontos = 0;
+  for (const obra of obras) {
+    const obraTokens = new Set(tokensChave(`${obra.nome} ${obra.endereco ?? ""}`));
+    let pontos = 0;
+    for (const t of linhaTokens) {
+      if (obraTokens.has(t)) pontos += 1;
+    }
+    if (pontos > melhorPontos) {
+      segundoPontos = melhorPontos;
+      melhorPontos = pontos;
+      melhorId = obra.id;
+      melhorNome = obra.nome;
+    } else if (pontos > segundoPontos) {
+      segundoPontos = pontos;
+    }
+  }
+  if (melhorPontos >= 2 && melhorPontos > segundoPontos && melhorId) {
+    return { id: melhorId, nome: melhorNome };
+  }
+  return null;
+}
