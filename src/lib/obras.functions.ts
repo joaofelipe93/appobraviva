@@ -18,8 +18,13 @@ import {
   resumoDaUnidade,
   unidadeBanco,
   unidadesDoCliente,
+  importarInvestidoresSchema,
+  tokensChave,
+  melhorObraParaLinha,
+  soDigitos,
+  cpfValido,
 } from "./obras.schemas";
-import type { ExcelDados, ResumoIA, ResumosUnidades } from "./obras.schemas";
+import type { ExcelDados, ResumoIA, ResumosUnidades, ObraParaMatch, RelatorioImportacao } from "./obras.schemas";
 
 import { z } from "zod";
 
@@ -335,6 +340,244 @@ export const removerUnidadePreCadastro = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+
+
+export const importarInvestidoresExcel = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => importarInvestidoresSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { garantirAdmin } = await import("./admin.server");
+    await garantirAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Decodifica o base64 (data URL ou puro) e lê a planilha.
+    const bruto = data.arquivo.includes(",")
+      ? data.arquivo.split(",").slice(1).join(",")
+      : data.arquivo;
+    const binario = Uint8Array.from(Buffer.from(bruto, "base64"));
+
+    const XLSX = await import("xlsx");
+    const planilha = XLSX.read(binario, { type: "array" });
+    const primeira = planilha.SheetNames[0];
+    if (!primeira) throw new Error("A planilha está vazia.");
+
+    const matriz = XLSX.utils.sheet_to_json<unknown[]>(planilha.Sheets[primeira]!, {
+      header: 1,
+      blankrows: false,
+      defval: "",
+    });
+
+    const cabecalho = (matriz[0] ?? []).map((celula, indice) =>
+      String(celula ?? "").trim() || `Coluna ${indice + 1}`,
+    );
+    const normCab = cabecalho.map((c) => c.toLowerCase());
+    const indiceDe = (alvos: string[]): number => {
+      for (const alvo of alvos) {
+        const idx = normCab.findIndex((c) => c.includes(alvo));
+        if (idx >= 0) return idx;
+      }
+      return -1;
+    };
+
+    const iNome = indiceDe(["nome", "investidor", "cliente", "pessoa"]);
+    const iCpf = indiceDe(["cpf", "cpf/cnpj", "cnpj"]);
+    const iEmail = indiceDe(["email", "e-mail", "mail"]);
+    const iTel = indiceDe(["telefone", "tel", "celular", "whats"]);
+    const iIncorp = indiceDe(["incorporadora", "construtora", "empreendimento"]);
+    const iCidade = indiceDe(["cidade", "municipio", "município", "local"]);
+    const iQuadra = indiceDe(["quadra", "loteamento", "rua"]);
+    const iLote = indiceDe(["lote", "lote."]);
+    const iCasa = indiceDe(["casa", "unidade", "imovel", "imóvel", "apto"]);
+    const iPct = indiceDe(["percentual", "cota", "%", "quota"]);
+    const iCont = indiceDe(["contrato", "status"]);
+
+    if (iCpf < 0 || iNome < 0) {
+      throw new Error("A planilha precisa ter colunas de Nome e CPF.");
+    }
+
+    const cel = (linha: unknown[], indice: number): string =>
+      indice < 0 ? "" : String(linha[indice] ?? "").trim();
+
+    const { data: obras } = await supabaseAdmin
+      .from("obras")
+      .select("id, nome, endereco")
+      .order("nome", { ascending: true });
+    const obrasLista: ObraParaMatch[] = (obras ?? []).map((o) => ({
+      id: o.id,
+      nome: o.nome,
+      endereco: o.endereco ?? null,
+    }));
+
+    const { data: preExistentes } = await supabaseAdmin
+      .from("pre_cadastros")
+      .select("id, cpf, nome, email, telefone, usado_por");
+    const porCpf = new Map<string, { id: string; usado_por: string | null }>();
+    for (const p of preExistentes ?? []) {
+      porCpf.set(p.cpf, { id: p.id, usado_por: p.usado_por });
+    }
+
+    const linhas = matriz.slice(1, 1001);
+    const erros: { linha: number; nome: string; motivo: string }[] = [];
+    const obrasNaoEncontradas = new Map<string, number>();
+    let importados = 0;
+    let atualizados = 0;
+    let unidadesVinculadas = 0;
+    let ativosVinculados = 0;
+
+    // Acumula novos pré-cadastros (dedup por CPF) e atualizações.
+    const novosPre = new Map<string, { nome: string; email: string; telefone: string }>();
+    const atualizarPre: { id: string; nome: string; email: string; telefone: string }[] = [];
+    const unidadesPorCpf = new Map<
+      string,
+      { obraId: string; unidade: string; percentual: number | null; contrato_ok: boolean }[]
+    >();
+
+    for (let idx = 0; idx < linhas.length; idx += 1) {
+      const linha = linhas[idx]!;
+      const numeroLinha = idx + 2;
+      const nome = cel(linha, iNome);
+      const cpf = soDigitos(cel(linha, iCpf));
+      const email = cel(linha, iEmail).toLowerCase();
+      const telefone = cel(linha, iTel);
+      const chaveTokens = tokensChave(
+        [cel(linha, iIncorp), cel(linha, iCidade), cel(linha, iQuadra), cel(linha, iLote), cel(linha, iCasa)].join(" "),
+      );
+      const obra = melhorObraParaLinha(chaveTokens, obrasLista);
+      if (!obra) {
+        const chave = [cel(linha, iIncorp), cel(linha, iCidade), cel(linha, iQuadra), cel(linha, iLote)]
+          .filter(Boolean)
+          .join(" - ");
+        if (chave) obrasNaoEncontradas.set(chave, (obrasNaoEncontradas.get(chave) ?? 0) + 1);
+      }
+
+      if (!nome) {
+        erros.push({ linha: numeroLinha, nome, motivo: "Nome vazio." });
+        continue;
+      }
+      if (!cpfValido(cpf)) {
+        erros.push({ linha: numeroLinha, nome, motivo: "CPF inválido." });
+        continue;
+      }
+
+      const registro = { nome, email, telefone };
+      const existente = porCpf.get(cpf);
+      if (existente) {
+        atualizarPre.push({ id: existente.id, ...registro });
+      } else {
+        novosPre.set(cpf, registro);
+      }
+
+      if (obra) {
+        const pctTxt = cel(linha, iPct).replace("%", "").replace(",", ".").trim();
+        const percentual = pctTxt === "" || Number.isNaN(Number(pctTxt)) ? null : Number(pctTxt);
+        const contratoTxt = cel(linha, iCont).toLowerCase().trim();
+        const contrato_ok = /^(sim|ok|assin|firm|pago|✓|x|true|1)/.test(contratoTxt);
+        const lista = unidadesPorCpf.get(cpf) ?? [];
+        lista.push({ obraId: obra.id, unidade: unidadeBanco(cel(linha, iCasa)), percentual, contrato_ok });
+        unidadesPorCpf.set(cpf, lista);
+      }
+    }
+
+    // 1. Cria novos pré-cadastros.
+    if (novosPre.size > 0) {
+      const novos = [...novosPre.entries()].map(([cpf, r]) => ({
+        nome: r.nome,
+        cpf,
+        email: r.email || `${cpf}@sem-email`,
+        telefone: r.telefone || null,
+        papel: "cliente" as const,
+        criado_por: context.userId,
+      }));
+      const { data: criados, error: erroNovos } = await supabaseAdmin
+        .from("pre_cadastros")
+        .insert(novos)
+        .select("id, cpf");
+      if (erroNovos) throw new Error(erroNovos.message);
+      for (const c of criados ?? []) {
+        porCpf.set(c.cpf, { id: c.id, usado_por: null });
+        importados += 1;
+      }
+    }
+
+    // 2. Atualiza pré-cadastros existentes (nome/e-mail/telefone).
+    for (const a of atualizarPre) {
+      const { error: erroUpd } = await supabaseAdmin
+        .from("pre_cadastros")
+        .update({ nome: a.nome, email: a.email, telefone: a.telefone || null })
+        .eq("id", a.id);
+      if (erroUpd) throw new Error(erroUpd.message);
+      atualizados += 1;
+    }
+
+    // 3. Vincula unidades e, se o investidor já ativou a conta, obra_clientes.
+    const unidadesParaVincular: {
+      pre_cadastro_id: string;
+      obra_id: string;
+      unidade: string;
+      percentual: number | null;
+      contrato_ok: boolean;
+    }[] = [];
+    const ativosParaVincular: {
+      obra_id: string;
+      cliente_id: string;
+      unidade: string;
+      percentual: number | null;
+      contrato_ok: boolean;
+    }[] = [];
+
+    for (const [cpf, unidades] of unidadesPorCpf) {
+      const pre = porCpf.get(cpf);
+      if (!pre) continue;
+      for (const u of unidades) {
+        unidadesParaVincular.push({
+          pre_cadastro_id: pre.id,
+          obra_id: u.obraId,
+          unidade: u.unidade,
+          percentual: u.percentual,
+          contrato_ok: u.contrato_ok,
+        });
+        if (pre.usado_por) {
+          ativosParaVincular.push({
+            obra_id: u.obraId,
+            cliente_id: pre.usado_por,
+            unidade: u.unidade,
+            percentual: u.percentual,
+            contrato_ok: u.contrato_ok,
+          });
+        }
+      }
+    }
+
+    if (unidadesParaVincular.length > 0) {
+      const { error: erroUnidades } = await supabaseAdmin
+        .from("pre_cadastro_unidades")
+        .upsert(unidadesParaVincular, { onConflict: "pre_cadastro_id,obra_id,unidade" });
+      if (erroUnidades) throw new Error(erroUnidades.message);
+      unidadesVinculadas = unidadesParaVincular.length;
+    }
+
+    if (ativosParaVincular.length > 0) {
+      const { error: erroAtivos } = await supabaseAdmin
+        .from("obra_clientes")
+        .upsert(ativosParaVincular, { onConflict: "obra_id,cliente_id,unidade" });
+      if (erroAtivos) throw new Error(erroAtivos.message);
+      ativosVinculados = ativosParaVincular.length;
+    }
+
+    const relatorio: RelatorioImportacao = {
+      totalLinhas: linhas.length,
+      importados,
+      atualizados,
+      unidadesVinculadas,
+      ativosVinculados,
+      erros,
+      obrasNaoEncontradas: [...obrasNaoEncontradas.entries()].map(([chave, quantidade]) => ({
+        chave,
+        quantidade,
+      })),
+    };
+    return relatorio;
+  });
 
 export const removerPreCadastro = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

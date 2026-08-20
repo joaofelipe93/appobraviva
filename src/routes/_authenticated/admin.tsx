@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
-import { Plus, Search, Trash2, UserPlus, X } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileSpreadsheet, Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Link } from "@tanstack/react-router";
 import {
   adicionarUnidadePreCadastro,
   criarPreCadastro,
+  importarInvestidoresExcel,
   listarObrasAdmin,
   listarPreCadastros,
   meuPerfil,
@@ -22,6 +23,7 @@ import {
   removerUnidadePreCadastro,
 } from "@/lib/obras.functions";
 import { formatarCpf, normalizarUnidade, preCadastroSchema } from "@/lib/obras.schemas";
+import type { RelatorioImportacao } from "@/lib/obras.schemas";
 import type { z } from "zod";
 
 type PreCadastroEntrada = z.infer<typeof preCadastroSchema>;
@@ -231,6 +233,13 @@ function AdminPainel() {
       titulo="Administração"
       descricao="Somente CPFs liberados aqui conseguem criar conta no ObraViva."
     >
+        <ImportarPlanilha
+          onChange={async () => {
+            await queryClient.invalidateQueries({ queryKey: ["pre-cadastros"] });
+            await queryClient.invalidateQueries({ queryKey: ["obras-admin"] });
+          }}
+        />
+
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <Card className="rounded-sm border-t-4 border-t-accent">
           <CardHeader>
@@ -685,5 +694,129 @@ function CasasDoCliente({
         </div>
       )}
     </div>
+  );
+}
+
+function Resumo({ rotulo, valor }: { rotulo: string; valor: number }) {
+  return (
+    <div className="rounded-sm bg-muted/40 p-2">
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{rotulo}</p>
+      <p className="text-lg font-semibold">{valor}</p>
+    </div>
+  );
+}
+
+function ImportarPlanilha({ onChange }: { onChange: () => Promise<void> | void }) {
+  const importarFn = useServerFn(importarInvestidoresExcel);
+  const [relatorio, setRelatorio] = useState<RelatorioImportacao | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const importar = useMutation({
+    mutationFn: async (arquivo: File) => {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const leitor = new FileReader();
+        leitor.onload = () => resolve(String(leitor.result ?? ""));
+        leitor.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+        leitor.readAsDataURL(arquivo);
+      });
+      return importarFn({ data: { arquivo: dataUrl, nome: arquivo.name } });
+    },
+    onSuccess: async (r) => {
+      setRelatorio(r);
+      await onChange();
+      if (r.erros.length === 0 && r.obrasNaoEncontradas.length === 0) {
+        toast.success(`Importação concluída: ${r.importados} novos, ${r.unidadesVinculadas} casas.`);
+      } else {
+        toast.success("Importação concluída com ressalvas. Veja o resumo abaixo.");
+      }
+    },
+    onError: (erro) =>
+      toast.error("Falha na importação", {
+        description: erro instanceof Error ? erro.message : undefined,
+      }),
+  });
+
+  return (
+    <Card className="rounded-sm">
+      <CardHeader>
+        <CardTitle className="font-display uppercase">Importar planilha de investidores</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          Envie um Excel (.xlsx) com as colunas Nome, CPF, E-mail, Telefone, Incorporadora, Cidade,
+          Quadra, Lote, Casa, Percentual da Cota e Contrato. As casas são vinculadas às obras já
+          cadastradas; obras não encontradas aparecem no resumo para você criar antes de reimportar.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            aria-label="Selecionar planilha de investidores"
+            className="text-sm file:mr-2 file:rounded-sm file:border-0 file:bg-accent file:px-3 file:py-1 file:text-accent-foreground"
+          />
+          <Button
+            type="button"
+            disabled={importar.isPending}
+            onClick={() => {
+              const arquivo = inputRef.current?.files?.[0];
+              if (!arquivo) {
+                toast.error("Selecione um arquivo .xlsx.");
+                return;
+              }
+              importar.mutate(arquivo);
+            }}
+          >
+            <FileSpreadsheet className="mr-1 h-4 w-4" />
+            {importar.isPending ? "Importando..." : "Importar"}
+          </Button>
+        </div>
+
+        {relatorio && (
+          <div className="space-y-2 rounded-sm border border-border p-3 text-sm">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <Resumo rotulo="Linhas" valor={relatorio.totalLinhas} />
+              <Resumo rotulo="Novos" valor={relatorio.importados} />
+              <Resumo rotulo="Atualizados" valor={relatorio.atualizados} />
+              <Resumo rotulo="Casas" valor={relatorio.unidadesVinculadas} />
+            </div>
+            {relatorio.ativosVinculados > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {relatorio.ativosVinculados} vínculo(s) aplicado(s) a contas já ativas.
+              </p>
+            )}
+            {relatorio.erros.length > 0 && (
+              <div>
+                <p className="font-semibold text-destructive">Linhas com erro:</p>
+                <ul className="ml-4 list-disc text-xs text-muted-foreground">
+                  {relatorio.erros.map((e) => (
+                    <li key={e.linha}>
+                      Linha {e.linha} — {e.nome || "(sem nome)"}: {e.motivo}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {relatorio.obrasNaoEncontradas.length > 0 && (
+              <div>
+                <p className="font-semibold text-accent">
+                  Obras não encontradas (criar antes de reimportar):
+                </p>
+                <ul className="ml-4 list-disc text-xs text-muted-foreground">
+                  {relatorio.obrasNaoEncontradas.map((o) => (
+                    <li key={o.chave}>
+                      {o.chave} — {o.quantidade} linha(s)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {relatorio.erros.length === 0 && relatorio.obrasNaoEncontradas.length === 0 && (
+              <p className="text-xs text-muted-foreground">Tudo certo, sem ressalvas.</p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
