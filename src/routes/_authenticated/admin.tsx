@@ -366,8 +366,57 @@ function AdminPainel() {
         </Card>
 
         <Card className="rounded-sm">
-          <CardHeader>
-            <CardTitle className="font-display uppercase">Pessoas liberadas</CardTitle>
+          <CardHeader className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="font-display uppercase">Pessoas liberadas</CardTitle>
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                {resultados.length} de {(lista.data ?? []).length}
+              </span>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome, CPF, e-mail, telefone, casa ou obra"
+                aria-label="Buscar pessoa liberada"
+                className="rounded-sm pl-9 pr-9"
+              />
+              {busca !== "" && (
+                <button
+                  type="button"
+                  aria-label="Limpar busca"
+                  onClick={() => setBusca("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["todos", "Todos"],
+                  ["cliente", "Clientes"],
+                  ["engenheiro", "Engenheiros"],
+                  ["ativos", "Conta ativa"],
+                  ["pendentes", "Aguardando"],
+                ] as const
+              ).map(([valor, rotulo]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setFiltro(valor)}
+                  className={`rounded-sm border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                    filtro === valor
+                      ? "border-accent bg-accent text-accent-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {lista.isLoading && <Skeleton className="h-24 w-full" />}
@@ -376,7 +425,13 @@ function AdminPainel() {
                 Nenhum pré-cadastro ainda. Libere o primeiro engenheiro ao lado.
               </p>
             )}
-            {(lista.data ?? []).map((item) => (
+            {lista.data && lista.data.length > 0 && resultados.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Nenhuma pessoa encontrada para esta busca.
+              </p>
+            )}
+            {resultados.map((item) => (
+
               <div key={item.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
