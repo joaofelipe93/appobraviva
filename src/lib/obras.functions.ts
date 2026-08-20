@@ -433,8 +433,9 @@ export const obterObra = createServerFn({ method: "GET" })
           .order("created_at", { ascending: false }),
         context.supabase
           .from("obra_clientes")
-          .select("cliente_id, unidade")
+          .select("cliente_id, unidade, percentual, contrato_ok")
           .eq("obra_id", data.obraId),
+
         context.supabase.from("leituras").select("atualizacao_id").eq("user_id", context.userId),
       ]);
 
