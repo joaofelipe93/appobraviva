@@ -172,21 +172,27 @@ export type Database = {
       obra_clientes: {
         Row: {
           cliente_id: string
+          contrato_ok: boolean
           created_at: string
           obra_id: string
-          unidade: string | null
+          percentual: number | null
+          unidade: string
         }
         Insert: {
           cliente_id: string
+          contrato_ok?: boolean
           created_at?: string
           obra_id: string
-          unidade?: string | null
+          percentual?: number | null
+          unidade?: string
         }
         Update: {
           cliente_id?: string
+          contrato_ok?: boolean
           created_at?: string
           obra_id?: string
-          unidade?: string | null
+          percentual?: number | null
+          unidade?: string
         }
         Relationships: [
           {
@@ -228,6 +234,51 @@ export type Database = {
         }
         Relationships: []
       }
+      pre_cadastro_unidades: {
+        Row: {
+          contrato_ok: boolean
+          created_at: string
+          id: string
+          obra_id: string
+          percentual: number | null
+          pre_cadastro_id: string
+          unidade: string
+        }
+        Insert: {
+          contrato_ok?: boolean
+          created_at?: string
+          id?: string
+          obra_id: string
+          percentual?: number | null
+          pre_cadastro_id: string
+          unidade?: string
+        }
+        Update: {
+          contrato_ok?: boolean
+          created_at?: string
+          id?: string
+          obra_id?: string
+          percentual?: number | null
+          pre_cadastro_id?: string
+          unidade?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pre_cadastro_unidades_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_cadastro_unidades_pre_cadastro_id_fkey"
+            columns: ["pre_cadastro_id"]
+            isOneToOne: false
+            referencedRelation: "pre_cadastros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pre_cadastros: {
         Row: {
           cpf: string
@@ -238,6 +289,7 @@ export type Database = {
           nome: string
           obra_id: string | null
           papel: Database["public"]["Enums"]["app_role"]
+          telefone: string | null
           unidade: string | null
           updated_at: string
           usado_em: string | null
@@ -252,6 +304,7 @@ export type Database = {
           nome?: string
           obra_id?: string | null
           papel: Database["public"]["Enums"]["app_role"]
+          telefone?: string | null
           unidade?: string | null
           updated_at?: string
           usado_em?: string | null
@@ -266,6 +319,7 @@ export type Database = {
           nome?: string
           obra_id?: string | null
           papel?: Database["public"]["Enums"]["app_role"]
+          telefone?: string | null
           unidade?: string | null
           updated_at?: string
           usado_em?: string | null
@@ -288,6 +342,7 @@ export type Database = {
           email: string
           id: string
           nome: string
+          telefone: string | null
         }
         Insert: {
           cpf?: string | null
@@ -295,6 +350,7 @@ export type Database = {
           email?: string
           id: string
           nome?: string
+          telefone?: string | null
         }
         Update: {
           cpf?: string | null
@@ -302,6 +358,7 @@ export type Database = {
           email?: string
           id?: string
           nome?: string
+          telefone?: string | null
         }
         Relationships: []
       }
