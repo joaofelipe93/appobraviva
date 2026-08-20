@@ -247,3 +247,44 @@ export function agruparExcelPorUnidade(dados: ExcelDados): Map<string, ExcelDado
   }
   return grupos;
 }
+
+/** Valor guardado no banco para a casa (vazio = obra inteira). */
+export function unidadeBanco(valor: string | null | undefined): string {
+  return normalizarUnidade(valor) ?? "";
+}
+
+/** Casas do cliente, ignorando vazios. Lista vazia = acesso à obra inteira. */
+export function unidadesDoCliente(valores: (string | null | undefined)[]): string[] {
+  const conjunto = new Set<string>();
+  for (const valor of valores) {
+    const unidade = normalizarUnidade(valor);
+    if (!unidade) return [];
+    conjunto.add(unidade);
+  }
+  return [...conjunto].sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+}
+
+/** Mantém as linhas das casas informadas (linhas sem casa detectada são gerais). */
+export function filtrarExcelPorUnidades(
+  dados: ExcelDados | null,
+  unidades: string[],
+): ExcelDados | null {
+  if (!dados) return null;
+  if (unidades.length === 0) return dados;
+  const alvos = unidades.map((u) => u.toLowerCase());
+  const linhas = dados.linhas.filter((linha) => {
+    const daLinha = detectarUnidadeDaLinha(linha);
+    return !daLinha || alvos.includes(daLinha.toLowerCase());
+  });
+  return { ...dados, linhas };
+}
+
+/** Resumo guardado para a casa informada (comparação sem diferenciar maiúsculas). */
+export function resumoDaUnidade(
+  resumos: ResumosUnidades | null | undefined,
+  unidade: string,
+): ResumoIA | null {
+  if (!resumos) return null;
+  const chave = Object.keys(resumos).find((k) => k.toLowerCase() === unidade.toLowerCase());
+  return chave ? (resumos[chave] ?? null) : null;
+}
