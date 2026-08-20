@@ -101,10 +101,46 @@ function AdminPainel() {
     contrato_ok: false,
   });
 
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<
+    "todos" | "cliente" | "engenheiro" | "ativos" | "pendentes"
+  >("todos");
+
   const lista = useQuery({ queryKey: ["pre-cadastros"], queryFn: () => listarFn({}) });
   const obras = useQuery({ queryKey: ["obras-admin"], queryFn: () => obrasFn({}) });
   const opcoes: ObraOpcao[] = obras.data ?? [];
   const nomeDaObra = (id: string) => opcoes.find((o) => o.id === id)?.nome ?? "Obra";
+
+  const resultados = useMemo(() => {
+    const termos = semAcento(busca)
+      .split(/\s+/)
+      .map((t) => t.replace(/[.\-()\s]/g, ""))
+      .filter(Boolean);
+
+    return (lista.data ?? []).filter((item) => {
+      if (filtro === "cliente" || filtro === "engenheiro") {
+        if (item.papel !== filtro) return false;
+      }
+      if (filtro === "ativos" && !item.usado_em) return false;
+      if (filtro === "pendentes" && item.usado_em) return false;
+      if (termos.length === 0) return true;
+
+      const alvo = semAcento(
+        [
+          item.nome,
+          item.cpf,
+          formatarCpf(item.cpf),
+          item.email,
+          item.telefone ?? "",
+          item.papel,
+          ...item.unidades.flatMap((u) => [u.unidade, u.obraNome]),
+        ].join(" "),
+      ).replace(/[.\-()\s]/g, "");
+
+      return termos.every((termo) => alvo.includes(termo));
+    });
+  }, [lista.data, busca, filtro]);
+
 
   const criar = useMutation({
     mutationFn: (valores: PreCadastroEntrada) => criarFn({ data: valores }),
