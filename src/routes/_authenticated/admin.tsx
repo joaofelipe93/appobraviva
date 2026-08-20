@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { Plus, Trash2, UserPlus, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Search, Trash2, UserPlus, X } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,14 @@ export const Route = createFileRoute("/_authenticated/admin")({
 });
 
 type ObraOpcao = { id: string; nome: string };
+
+function semAcento(texto: string) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
 
 type CasaForm = {
   obraId: string;
@@ -101,10 +109,46 @@ function AdminPainel() {
     contrato_ok: false,
   });
 
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<
+    "todos" | "cliente" | "engenheiro" | "ativos" | "pendentes"
+  >("todos");
+
   const lista = useQuery({ queryKey: ["pre-cadastros"], queryFn: () => listarFn({}) });
   const obras = useQuery({ queryKey: ["obras-admin"], queryFn: () => obrasFn({}) });
   const opcoes: ObraOpcao[] = obras.data ?? [];
   const nomeDaObra = (id: string) => opcoes.find((o) => o.id === id)?.nome ?? "Obra";
+
+  const resultados = useMemo(() => {
+    const termos = semAcento(busca)
+      .split(/\s+/)
+      .map((t) => t.replace(/[.\-()\s]/g, ""))
+      .filter(Boolean);
+
+    return (lista.data ?? []).filter((item) => {
+      if (filtro === "cliente" || filtro === "engenheiro") {
+        if (item.papel !== filtro) return false;
+      }
+      if (filtro === "ativos" && !item.usado_em) return false;
+      if (filtro === "pendentes" && item.usado_em) return false;
+      if (termos.length === 0) return true;
+
+      const alvo = semAcento(
+        [
+          item.nome,
+          item.cpf,
+          formatarCpf(item.cpf),
+          item.email,
+          item.telefone ?? "",
+          item.papel,
+          ...item.unidades.flatMap((u) => [u.unidade, u.obraNome]),
+        ].join(" "),
+      ).replace(/[.\-()\s]/g, "");
+
+      return termos.every((termo) => alvo.includes(termo));
+    });
+  }, [lista.data, busca, filtro]);
+
 
   const criar = useMutation({
     mutationFn: (valores: PreCadastroEntrada) => criarFn({ data: valores }),
@@ -366,8 +410,57 @@ function AdminPainel() {
         </Card>
 
         <Card className="rounded-sm">
-          <CardHeader>
-            <CardTitle className="font-display uppercase">Pessoas liberadas</CardTitle>
+          <CardHeader className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="font-display uppercase">Pessoas liberadas</CardTitle>
+              <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                {resultados.length} de {(lista.data ?? []).length}
+              </span>
+            </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por nome, CPF, e-mail, telefone, casa ou obra"
+                aria-label="Buscar pessoa liberada"
+                className="rounded-sm pl-9 pr-9"
+              />
+              {busca !== "" && (
+                <button
+                  type="button"
+                  aria-label="Limpar busca"
+                  onClick={() => setBusca("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["todos", "Todos"],
+                  ["cliente", "Clientes"],
+                  ["engenheiro", "Engenheiros"],
+                  ["ativos", "Conta ativa"],
+                  ["pendentes", "Aguardando"],
+                ] as const
+              ).map(([valor, rotulo]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  onClick={() => setFiltro(valor)}
+                  className={`rounded-sm border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide transition-colors ${
+                    filtro === valor
+                      ? "border-accent bg-accent text-accent-foreground"
+                      : "border-border bg-background text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {lista.isLoading && <Skeleton className="h-24 w-full" />}
@@ -376,7 +469,13 @@ function AdminPainel() {
                 Nenhum pré-cadastro ainda. Libere o primeiro engenheiro ao lado.
               </p>
             )}
-            {(lista.data ?? []).map((item) => (
+            {lista.data && lista.data.length > 0 && resultados.length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                Nenhuma pessoa encontrada para esta busca.
+              </p>
+            )}
+            {resultados.map((item) => (
+
               <div key={item.id} className="border-b border-border pb-3 last:border-0 last:pb-0">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
