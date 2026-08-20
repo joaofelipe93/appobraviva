@@ -576,12 +576,12 @@ export const vincularCliente = createServerFn({ method: "POST" })
       throw new Error("Esta conta não é uma conta de cliente.");
     }
 
-    const unidade = normalizarUnidade(data.unidade);
+    const unidade = unidadeBanco(data.unidade);
     const { error } = await context.supabase
       .from("obra_clientes")
       .upsert(
         { obra_id: data.obraId, cliente_id: perfil.id, unidade },
-        { onConflict: "obra_id,cliente_id" },
+        { onConflict: "obra_id,cliente_id,unidade" },
       );
     if (error) throw new Error(error.message);
 
@@ -591,17 +591,26 @@ export const vincularCliente = createServerFn({ method: "POST" })
 export const desvincularCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ obraId: z.string().uuid(), clienteId: z.string().uuid() }).parse(input),
+    z
+      .object({
+        obraId: z.string().uuid(),
+        clienteId: z.string().uuid(),
+        unidade: z.string().max(60).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    let consulta = context.supabase
       .from("obra_clientes")
       .delete()
       .eq("obra_id", data.obraId)
       .eq("cliente_id", data.clienteId);
+    if (data.unidade !== undefined) consulta = consulta.eq("unidade", data.unidade);
+    const { error } = await consulta;
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const salvarEtapa = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
