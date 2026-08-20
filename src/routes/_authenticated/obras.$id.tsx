@@ -337,6 +337,9 @@ function Clientes({
     email: string;
     cpf: string | null;
     unidade: string | null;
+    unidadeChave: string;
+    percentual: number | null;
+    contrato_ok: boolean;
   }[];
   onChange: () => Promise<void>;
 }) {
@@ -355,7 +358,7 @@ function Clientes({
       )}
       {clientes.map((cliente) => (
         <div
-          key={cliente.id}
+          key={`${cliente.id}-${cliente.unidadeChave}`}
           className="flex items-center justify-between gap-2 rounded-sm border border-border p-2"
         >
           <div>
@@ -365,15 +368,18 @@ function Clientes({
             </p>
             <p className="text-xs font-semibold uppercase text-accent">
               {cliente.unidade ? cliente.unidade : "Obra inteira"}
+              {cliente.percentual !== null ? ` · ${cliente.percentual}% da cota` : ""}
             </p>
           </div>
           <Button
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground"
-            aria-label={`Remover ${cliente.nome}`}
+            aria-label={`Remover ${cliente.nome} de ${cliente.unidade ?? "obra inteira"}`}
             onClick={async () => {
-              await desvincular({ data: { obraId, clienteId: cliente.id } });
+              await desvincular({
+                data: { obraId, clienteId: cliente.id, unidade: cliente.unidadeChave },
+              });
               await onChange();
             }}
           >
@@ -381,6 +387,7 @@ function Clientes({
           </Button>
         </div>
       ))}
+
 
       <form
         className="space-y-2"
