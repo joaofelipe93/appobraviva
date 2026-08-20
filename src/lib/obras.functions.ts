@@ -438,23 +438,41 @@ export const obterObra = createServerFn({ method: "GET" })
         context.supabase.from("leituras").select("atualizacao_id").eq("user_id", context.userId),
       ]);
 
-    const clienteIds = (vinculos ?? []).map((v) => v.cliente_id);
+    const clienteIds = [...new Set((vinculos ?? []).map((v) => v.cliente_id))];
     let clientes: {
       id: string;
       nome: string;
       email: string;
       cpf: string | null;
       unidade: string | null;
+      percentual: number | null;
+      contrato_ok: boolean;
     }[] = [];
     if (clienteIds.length > 0) {
       const { data: perfis } = await context.supabase
         .from("profiles")
         .select("id, nome, email, cpf")
         .in("id", clienteIds);
-      clientes = (perfis ?? []).map((perfil) => ({
-        ...perfil,
-        unidade: (vinculos ?? []).find((v) => v.cliente_id === perfil.id)?.unidade ?? null,
-      }));
+      const porId = new Map((perfis ?? []).map((p) => [p.id, p]));
+      // Uma linha por casa: o mesmo cliente pode ter várias casas na obra.
+      clientes = (vinculos ?? [])
+        .map((vinculo) => {
+          const perfil = porId.get(vinculo.cliente_id);
+          return {
+            id: vinculo.cliente_id,
+            nome: perfil?.nome ?? "",
+            email: perfil?.email ?? "",
+            cpf: perfil?.cpf ?? null,
+            unidade: normalizarUnidade(vinculo.unidade),
+            percentual: vinculo.percentual,
+            contrato_ok: vinculo.contrato_ok,
+          };
+        })
+        .sort(
+          (a, b) =>
+            a.nome.localeCompare(b.nome, "pt-BR") ||
+            (a.unidade ?? "").localeCompare(b.unidade ?? "", "pt-BR", { numeric: true }),
+        );
     }
 
     const unidades = Array.from(
@@ -464,6 +482,7 @@ export const obterObra = createServerFn({ method: "GET" })
           .filter((u): u is string => !!u),
       ),
     ).sort((a, b) => a.localeCompare(b, "pt-BR", { numeric: true }));
+
 
     const lidas = new Set((leituras ?? []).map((l) => l.atualizacao_id));
     const souEngenheiro = obra.engenheiro_id === context.userId;
