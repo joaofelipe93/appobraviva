@@ -926,16 +926,16 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
 
     const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
 
-    let minhaUnidade: string | null = null;
+    let minhasUnidades: string[] = [];
     if (!souEngenheiro) {
-      const { data: vinculo } = await context.supabase
+      const { data: vinculos } = await context.supabase
         .from("obra_clientes")
         .select("unidade")
         .eq("obra_id", atualizacao.obra_id)
-        .eq("cliente_id", context.userId)
-        .maybeSingle();
-      minhaUnidade = normalizarUnidade(vinculo?.unidade);
+        .eq("cliente_id", context.userId);
+      minhasUnidades = unidadesDoCliente((vinculos ?? []).map((v) => v.unidade));
     }
+
 
     if (!souEngenheiro) {
       await context.supabase
