@@ -1,7 +1,7 @@
 import { render } from "@react-email/render";
 import { NovaAtualizacaoEmail } from "./email-templates/nova-atualizacao";
 import { enviarEmail } from "./resend.server";
-import { normalizarUnidade } from "./obras.schemas";
+import { normalizarUnidade, resumoDaUnidade } from "./obras.schemas";
 import type { ResumoIA, ResumosUnidades } from "./obras.schemas";
 
 function urlBase(): string {
