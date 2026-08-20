@@ -22,6 +22,10 @@ import {
   removerUnidadePreCadastro,
 } from "@/lib/obras.functions";
 import { formatarCpf, normalizarUnidade, preCadastroSchema } from "@/lib/obras.schemas";
+import type { z } from "zod";
+
+type PreCadastroEntrada = z.infer<typeof preCadastroSchema>;
+
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
