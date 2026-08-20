@@ -446,9 +446,11 @@ export const obterObra = createServerFn({ method: "GET" })
       email: string;
       cpf: string | null;
       unidade: string | null;
+      unidadeChave: string;
       percentual: number | null;
       contrato_ok: boolean;
     }[] = [];
+
     if (clienteIds.length > 0) {
       const { data: perfis } = await context.supabase
         .from("profiles")
