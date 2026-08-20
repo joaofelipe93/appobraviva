@@ -157,9 +157,12 @@ function AtualizacaoPage() {
                   Responsável técnico: {dados.responsavelNome}
                 </p>
               )}
-              {dados.unidade && (
-                <p className="text-xs font-semibold uppercase text-accent">{dados.unidade}</p>
+              {dados.unidades.length > 0 && (
+                <p className="text-xs font-semibold uppercase text-accent">
+                  {dados.unidades.join(" · ")}
+                </p>
               )}
+
             </CardHeader>
             <CardContent className="space-y-3">
               {dados.resumo_ia ? (
