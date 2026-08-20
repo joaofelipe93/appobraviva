@@ -465,6 +465,8 @@ export const obterObra = createServerFn({ method: "GET" })
             email: perfil?.email ?? "",
             cpf: perfil?.cpf ?? null,
             unidade: normalizarUnidade(vinculo.unidade),
+            unidadeChave: vinculo.unidade ?? "",
+
             percentual: vinculo.percentual,
             contrato_ok: vinculo.contrato_ok,
           };
