@@ -970,13 +970,39 @@ export const excluirAtualizacao = createServerFn({ method: "POST" })
     z.object({ atualizacaoId: z.string().uuid() }).parse(input),
   )
   .handler(async ({ data, context }) => {
+    const { data: atualizacao, error: erroBusca } = await context.supabase
+      .from("atualizacoes")
+      .select("id, obra_id, excel_path, obras(engenheiro_id)")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+    if (erroBusca) throw new Error(erroBusca.message);
+    if (!atualizacao || atualizacao.obras?.engenheiro_id !== context.userId) {
+      throw new Error("Apenas o engenheiro responsável pode excluir esta atualização.");
+    }
+
+    const { data: midias } = await context.supabase
+      .from("midias")
+      .select("path")
+      .eq("atualizacao_id", data.atualizacaoId);
+
+    const arquivos = [
+      ...(midias ?? []).map((m) => m.path),
+      ...(atualizacao.excel_path ? [atualizacao.excel_path] : []),
+    ];
+
     const { error } = await context.supabase
       .from("atualizacoes")
       .delete()
       .eq("id", data.atualizacaoId);
     if (error) throw new Error(error.message);
-    return { ok: true };
+
+    if (arquivos.length > 0) {
+      await context.supabase.storage.from("obras").remove(arquivos);
+    }
+
+    return { ok: true, obraId: atualizacao.obra_id };
   });
+
 
 
 

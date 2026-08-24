@@ -1,10 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, CheckCircle2, FileSpreadsheet, UserRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, FileSpreadsheet, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,7 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { gerarResumoRelatorio, obterAtualizacao } from "@/lib/obras.functions";
+import { excluirAtualizacao, gerarResumoRelatorio, obterAtualizacao } from "@/lib/obras.functions";
+
 
 export const Route = createFileRoute("/_authenticated/atualizacoes/$id")({
   head: () => ({
@@ -37,9 +49,13 @@ export const Route = createFileRoute("/_authenticated/atualizacoes/$id")({
 
 function AtualizacaoPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const obterFn = useServerFn(obterAtualizacao);
   const gerarFn = useServerFn(gerarResumoRelatorio);
+  const excluirFn = useServerFn(excluirAtualizacao);
   const [gerando, setGerando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const consulta = useQuery({
     queryKey: ["atualizacao", id],
     queryFn: () => obterFn({ data: { atualizacaoId: id } }),
@@ -65,14 +81,58 @@ function AtualizacaoPage() {
 
   const dados = consulta.data;
 
+  async function confirmarExclusao() {
+    setExcluindo(true);
+    try {
+      await excluirFn({ data: { atualizacaoId: id } });
+      await queryClient.invalidateQueries({ queryKey: ["obra", dados.obraId] });
+      await queryClient.invalidateQueries({ queryKey: ["painel"] });
+      toast.success("Atualização excluída.");
+      navigate({ to: "/obras/$id", params: { id: dados.obraId } });
+    } catch (erro) {
+      toast.error("Não foi possível excluir a atualização", {
+        description: erro instanceof Error ? erro.message : undefined,
+      });
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   return (
     <AppShell
       titulo={`Visita de ${new Date(`${dados.data_visita}T12:00:00`).toLocaleDateString("pt-BR")}`}
       descricao={dados.obraNome}
       acao={
-        <Button asChild variant="outline">
-          <Link to="/obras/$id" params={{ id: dados.obraId }}>Ver obra</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/obras/$id" params={{ id: dados.obraId }}>Ver obra</Link>
+          </Button>
+          {dados.souEngenheiro && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={excluindo}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {excluindo ? "Excluindo..." : "Excluir atualização"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir esta atualização?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    As fotos, vídeos, planilha e resumos desta visita serão apagados
+                    permanentemente. Essa ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmarExclusao}>
+                    Excluir definitivamente
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       }
     >
       <div className="grid max-w-4xl gap-6">
