@@ -77,7 +77,16 @@ function Painel() {
           ? `Olá, ${perfil.data.nome || "engenheiro"}. Gerencie obras, etapas e publique atualizações.`
           : `Olá, ${perfil.data.nome || "cliente"}. Acompanhe o andamento das suas obras.`
       }
-      acao={engenheiro ? <NovaObra /> : undefined}
+      acao={
+        engenheiro ? (
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/almoxarifado">Almoxarifado</Link>
+            </Button>
+            <NovaObra />
+          </div>
+        ) : undefined
+      }
     >
       {obras.isLoading && <Skeleton className="h-32 w-full" />}
 

@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as RedefinirSenhaRouteImport } from './routes/redefinir-senha'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAlmoxarifadoRouteImport } from './routes/_authenticated/almoxarifado'
 import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated/painel'
 import { Route as AuthenticatedAtualizacoesIdRouteImport } from './routes/_authenticated/atualizacoes.$id'
 import { Route as AuthenticatedObrasIdRouteImport } from './routes/_authenticated/obras.$id'
@@ -45,6 +46,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAlmoxarifadoRoute =
+  AuthenticatedAlmoxarifadoRouteImport.update({
+    id: '/almoxarifado',
+    path: '/almoxarifado',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPainelRoute = AuthenticatedPainelRouteImport.update({
   id: '/painel',
   path: '/painel',
@@ -83,6 +90,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/obras/$id': typeof AuthenticatedObrasIdRoute
@@ -95,6 +103,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/painel': typeof AuthenticatedPainelRoute
   '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/obras/$id': typeof AuthenticatedObrasIdRoute
@@ -109,6 +118,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/redefinir-senha': typeof RedefinirSenhaRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
   '/_authenticated/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/_authenticated/obras/$id': typeof AuthenticatedObrasIdRoute
@@ -123,6 +133,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/redefinir-senha'
     | '/admin'
+    | '/almoxarifado'
     | '/painel'
     | '/atualizacoes/$id'
     | '/obras/$id'
@@ -135,6 +146,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/redefinir-senha'
     | '/admin'
+    | '/almoxarifado'
     | '/painel'
     | '/atualizacoes/$id'
     | '/obras/$id'
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/redefinir-senha'
     | '/_authenticated/admin'
+    | '/_authenticated/almoxarifado'
     | '/_authenticated/painel'
     | '/_authenticated/atualizacoes/$id'
     | '/_authenticated/obras/$id'
@@ -202,6 +215,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/almoxarifado': {
+      id: '/_authenticated/almoxarifado'
+      path: '/almoxarifado'
+      fullPath: '/almoxarifado'
+      preLoaderRoute: typeof AuthenticatedAlmoxarifadoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/painel': {
       id: '/_authenticated/painel'
       path: '/painel'
@@ -249,6 +269,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAlmoxarifadoRoute: typeof AuthenticatedAlmoxarifadoRoute
   AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
   AuthenticatedAtualizacoesIdRoute: typeof AuthenticatedAtualizacoesIdRoute
   AuthenticatedObrasIdRoute: typeof AuthenticatedObrasIdRoute
@@ -257,6 +278,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAlmoxarifadoRoute: AuthenticatedAlmoxarifadoRoute,
   AuthenticatedPainelRoute: AuthenticatedPainelRoute,
   AuthenticatedAtualizacoesIdRoute: AuthenticatedAtualizacoesIdRoute,
   AuthenticatedObrasIdRoute: AuthenticatedObrasIdRoute,
