@@ -232,6 +232,11 @@ function AdminPainel() {
     <AppShell
       titulo="Administração"
       descricao="Somente CPFs liberados aqui conseguem criar conta no ObraViva."
+      acao={
+        <Button asChild variant="outline">
+          <Link to="/almoxarifado">Almoxarifado</Link>
+        </Button>
+      }
     >
         <ImportarPlanilha
           onChange={async () => {
