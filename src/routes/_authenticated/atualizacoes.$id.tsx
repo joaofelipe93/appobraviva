@@ -135,8 +135,6 @@ function AtualizacaoPage() {
         </div>
       }
     >
-
-    >
       <div className="grid max-w-4xl gap-6">
         {dados.observacoes && (
           <Card className="rounded-sm border-l-4 border-l-accent">
