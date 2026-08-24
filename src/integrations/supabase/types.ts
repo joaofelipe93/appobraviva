@@ -134,6 +134,56 @@ export type Database = {
           },
         ]
       }
+      materiais: {
+        Row: {
+          categoria: string
+          created_at: string
+          custo_unitario: number | null
+          estoque_minimo: number
+          fornecedor: string
+          id: string
+          nome: string
+          obra_id: string
+          observacoes: string
+          unidade_medida: string
+          updated_at: string
+        }
+        Insert: {
+          categoria?: string
+          created_at?: string
+          custo_unitario?: number | null
+          estoque_minimo?: number
+          fornecedor?: string
+          id?: string
+          nome: string
+          obra_id: string
+          observacoes?: string
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Update: {
+          categoria?: string
+          created_at?: string
+          custo_unitario?: number | null
+          estoque_minimo?: number
+          fornecedor?: string
+          id?: string
+          nome?: string
+          obra_id?: string
+          observacoes?: string
+          unidade_medida?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "materiais_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       midias: {
         Row: {
           atualizacao_id: string
@@ -165,6 +215,59 @@ export type Database = {
             columns: ["atualizacao_id"]
             isOneToOne: false
             referencedRelation: "atualizacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      movimentacoes_estoque: {
+        Row: {
+          created_at: string
+          criado_por: string
+          custo_unitario: number | null
+          data_movimento: string
+          fornecedor: string
+          id: string
+          material_id: string
+          nota_fiscal: string
+          observacoes: string
+          quantidade: number
+          responsavel: string
+          tipo: Database["public"]["Enums"]["movimentacao_tipo"]
+        }
+        Insert: {
+          created_at?: string
+          criado_por: string
+          custo_unitario?: number | null
+          data_movimento?: string
+          fornecedor?: string
+          id?: string
+          material_id: string
+          nota_fiscal?: string
+          observacoes?: string
+          quantidade: number
+          responsavel?: string
+          tipo: Database["public"]["Enums"]["movimentacao_tipo"]
+        }
+        Update: {
+          created_at?: string
+          criado_por?: string
+          custo_unitario?: number | null
+          data_movimento?: string
+          fornecedor?: string
+          id?: string
+          material_id?: string
+          nota_fiscal?: string
+          observacoes?: string
+          quantidade?: number
+          responsavel?: string
+          tipo?: Database["public"]["Enums"]["movimentacao_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimentacoes_estoque_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materiais"
             referencedColumns: ["id"]
           },
         ]
@@ -391,6 +494,7 @@ export type Database = {
       app_role: "engenheiro" | "cliente" | "admin"
       etapa_status: "nao_iniciada" | "em_andamento" | "concluida"
       midia_tipo: "foto" | "video"
+      movimentacao_tipo: "entrada" | "saida"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -521,6 +625,7 @@ export const Constants = {
       app_role: ["engenheiro", "cliente", "admin"],
       etapa_status: ["nao_iniciada", "em_andamento", "concluida"],
       midia_tipo: ["foto", "video"],
+      movimentacao_tipo: ["entrada", "saida"],
     },
   },
 } as const
