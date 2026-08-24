@@ -764,6 +764,7 @@ export const obterObra = createServerFn({ method: "GET" })
         previsao_termino: obra.previsao_termino,
       },
       souEngenheiro,
+      souAdmin,
       etapas: etapas ?? [],
       clientes,
       unidades,
