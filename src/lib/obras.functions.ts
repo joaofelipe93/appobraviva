@@ -1379,5 +1379,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
         (atualizacao.etapas_atualizadas ?? []).includes(e.id),
       ),
       souEngenheiro,
+      souAdmin: admin,
+
     };
   });
