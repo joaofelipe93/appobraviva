@@ -734,6 +734,13 @@ export const obterObra = createServerFn({ method: "GET" })
 
     const lidas = new Set((leituras ?? []).map((l) => l.atualizacao_id));
     const souEngenheiro = obra.engenheiro_id === context.userId;
+    const { data: papelAdmin } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    const souAdmin = !!papelAdmin;
 
     const midiaPaths = (atualizacoes ?? []).flatMap((a) =>
       (a.midias ?? []).slice(0, 4).map((m) => m.path),
