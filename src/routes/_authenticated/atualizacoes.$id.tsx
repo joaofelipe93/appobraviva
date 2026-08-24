@@ -49,9 +49,13 @@ export const Route = createFileRoute("/_authenticated/atualizacoes/$id")({
 
 function AtualizacaoPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const obterFn = useServerFn(obterAtualizacao);
   const gerarFn = useServerFn(gerarResumoRelatorio);
+  const excluirFn = useServerFn(excluirAtualizacao);
   const [gerando, setGerando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
   const consulta = useQuery({
     queryKey: ["atualizacao", id],
     queryFn: () => obterFn({ data: { atualizacaoId: id } }),
@@ -77,15 +81,61 @@ function AtualizacaoPage() {
 
   const dados = consulta.data;
 
+  async function confirmarExclusao() {
+    setExcluindo(true);
+    try {
+      await excluirFn({ data: { atualizacaoId: id } });
+      await queryClient.invalidateQueries({ queryKey: ["obra", dados.obraId] });
+      await queryClient.invalidateQueries({ queryKey: ["painel"] });
+      toast.success("Atualização excluída.");
+      navigate({ to: "/obras/$id", params: { id: dados.obraId } });
+    } catch (erro) {
+      toast.error("Não foi possível excluir a atualização", {
+        description: erro instanceof Error ? erro.message : undefined,
+      });
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
   return (
     <AppShell
       titulo={`Visita de ${new Date(`${dados.data_visita}T12:00:00`).toLocaleDateString("pt-BR")}`}
       descricao={dados.obraNome}
       acao={
-        <Button asChild variant="outline">
-          <Link to="/obras/$id" params={{ id: dados.obraId }}>Ver obra</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline">
+            <Link to="/obras/$id" params={{ id: dados.obraId }}>Ver obra</Link>
+          </Button>
+          {dados.souEngenheiro && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={excluindo}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {excluindo ? "Excluindo..." : "Excluir atualização"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Excluir esta atualização?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    As fotos, vídeos, planilha e resumos desta visita serão apagados
+                    permanentemente. Essa ação não pode ser desfeita.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmarExclusao}>
+                    Excluir definitivamente
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       }
+    >
+
     >
       <div className="grid max-w-4xl gap-6">
         {dados.observacoes && (
