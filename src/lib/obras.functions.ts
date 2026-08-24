@@ -1296,7 +1296,9 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       }
     }
 
-    const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
+    const admin = await souAdministrador(context);
+    const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId || admin;
+
 
     let minhasUnidades: string[] = [];
     if (!souEngenheiro) {
