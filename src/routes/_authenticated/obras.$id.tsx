@@ -1,8 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { CalendarDays, FileSpreadsheet, Images, Plus, Trash2, UserPlus, Video } from "lucide-react";
+import {
+  CalendarDays,
+  FileSpreadsheet,
+  Images,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  Video,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { BarraProgresso, TimelineEtapas } from "@/components/ProgressoObra";
@@ -13,6 +22,26 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -21,7 +50,9 @@ import {
 } from "@/components/ui/select";
 import {
   adicionarEtapa,
+  atualizarObra,
   desvincularCliente,
+  excluirObra,
   obterObra,
   removerEtapa,
   salvarEtapa,
@@ -33,6 +64,7 @@ import {
   progressoDasEtapas,
   type EtapaStatus,
 } from "@/lib/obras.schemas";
+
 
 export const Route = createFileRoute("/_authenticated/obras/$id")({
   head: () => ({
