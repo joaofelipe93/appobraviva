@@ -245,6 +245,32 @@ function AdminPainel() {
           }}
         />
 
+      <Card className="mt-6 rounded-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-display uppercase">Obras cadastradas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {opcoes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhuma obra cadastrada.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {opcoes.map((obra) => (
+                <Button key={obra.id} asChild variant="outline" size="sm">
+                  <Link to="/obras/$id" params={{ id: obra.id }}>
+                    {obra.nome}
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Abra a obra para editar os dados cadastrais ou excluí-la.
+          </p>
+        </CardContent>
+      </Card>
+
+
+
       <div className="grid gap-6 lg:grid-cols-[400px_1fr]">
         <Card className="rounded-sm border-t-4 border-t-accent">
           <CardHeader>
