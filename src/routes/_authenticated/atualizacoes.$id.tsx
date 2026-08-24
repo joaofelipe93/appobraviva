@@ -121,6 +121,23 @@ function AtualizacaoPage() {
     }
   }
 
+  async function salvarEdicao() {
+    setSalvando(true);
+    try {
+      await salvarFn({ data: { atualizacaoId: id, ...formData } });
+      await consulta.refetch();
+      await queryClient.invalidateQueries({ queryKey: ["obra", dados.obraId] });
+      toast.success("Atualização alterada.");
+      setEditando(false);
+    } catch (erro) {
+      toast.error("Não foi possível salvar as alterações", {
+        description: erro instanceof Error ? erro.message : undefined,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   return (
     <AppShell
       titulo={`Visita de ${new Date(`${dados.data_visita}T12:00:00`).toLocaleDateString("pt-BR")}`}
@@ -131,6 +148,66 @@ function AtualizacaoPage() {
             <Link to="/obras/$id" params={{ id: dados.obraId }}>Ver obra</Link>
           </Button>
           {dados.souEngenheiro && (
+            <Dialog
+              open={editando}
+              onOpenChange={(aberto) => {
+                setEditando(aberto);
+                if (aberto) {
+                  setFormData({
+                    data_visita: dados.data_visita,
+                    observacoes: dados.observacoes ?? "",
+                  });
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Pencil className="mr-2 h-4 w-4" /> Editar atualização
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Editar atualização</DialogTitle>
+                  <DialogDescription>
+                    Ajuste a data da visita e as observações desta publicação.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="data_visita">Data da visita</Label>
+                    <Input
+                      id="data_visita"
+                      type="date"
+                      value={formData.data_visita}
+                      onChange={(e) =>
+                        setFormData((atual) => ({ ...atual, data_visita: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="observacoes">Observações</Label>
+                    <Textarea
+                      id="observacoes"
+                      rows={6}
+                      value={formData.observacoes}
+                      onChange={(e) =>
+                        setFormData((atual) => ({ ...atual, observacoes: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditando(false)}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={salvarEdicao} disabled={salvando || !formData.data_visita}>
+                    {salvando ? "Salvando..." : "Salvar alterações"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+          {dados.souEngenheiro && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" disabled={excluindo}>
@@ -138,6 +215,7 @@ function AtualizacaoPage() {
                   {excluindo ? "Excluindo..." : "Excluir atualização"}
                 </Button>
               </AlertDialogTrigger>
+
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Excluir esta atualização?</AlertDialogTitle>
