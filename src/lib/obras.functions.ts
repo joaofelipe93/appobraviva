@@ -1019,6 +1019,48 @@ export const notificarAtualizacao = createServerFn({ method: "POST" })
 
 
 
+/** Verifica se o usuário é administrador (sem lançar erro). */
+async function souAdministrador(context: { supabase: any; userId: string }) {
+  const { data } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!data;
+}
+
+export const atualizarAtualizacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        atualizacaoId: z.string().uuid(),
+        data_visita: z.string().min(1),
+        observacoes: z.string().max(5000).default(""),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: atualizacao, error: erroBusca } = await context.supabase
+      .from("atualizacoes")
+      .select("id, obras(engenheiro_id)")
+      .eq("id", data.atualizacaoId)
+      .maybeSingle();
+    if (erroBusca) throw new Error(erroBusca.message);
+    const admin = await souAdministrador(context);
+    if (!atualizacao || (atualizacao.obras?.engenheiro_id !== context.userId && !admin)) {
+      throw new Error("Apenas o engenheiro responsável ou o administrador pode alterar esta atualização.");
+    }
+
+    const { error } = await context.supabase
+      .from("atualizacoes")
+      .update({ data_visita: data.data_visita, observacoes: data.observacoes })
+      .eq("id", data.atualizacaoId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const excluirAtualizacao = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -1031,9 +1073,11 @@ export const excluirAtualizacao = createServerFn({ method: "POST" })
       .eq("id", data.atualizacaoId)
       .maybeSingle();
     if (erroBusca) throw new Error(erroBusca.message);
-    if (!atualizacao || atualizacao.obras?.engenheiro_id !== context.userId) {
-      throw new Error("Apenas o engenheiro responsável pode excluir esta atualização.");
+    const admin = await souAdministrador(context);
+    if (!atualizacao || (atualizacao.obras?.engenheiro_id !== context.userId && !admin)) {
+      throw new Error("Apenas o engenheiro responsável ou o administrador pode excluir esta atualização.");
     }
+
 
     const { data: midias } = await context.supabase
       .from("midias")
@@ -1252,7 +1296,9 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
       }
     }
 
-    const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId;
+    const admin = await souAdministrador(context);
+    const souEngenheiro = atualizacao.obras?.engenheiro_id === context.userId || admin;
+
 
     let minhasUnidades: string[] = [];
     if (!souEngenheiro) {
@@ -1333,5 +1379,7 @@ export const obterAtualizacao = createServerFn({ method: "GET" })
         (atualizacao.etapas_atualizadas ?? []).includes(e.id),
       ),
       souEngenheiro,
+      souAdmin: admin,
+
     };
   });
