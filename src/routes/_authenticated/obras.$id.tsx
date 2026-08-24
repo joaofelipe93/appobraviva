@@ -1,8 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { CalendarDays, FileSpreadsheet, Images, Plus, Trash2, UserPlus, Video } from "lucide-react";
+import {
+  CalendarDays,
+  FileSpreadsheet,
+  Images,
+  Pencil,
+  Plus,
+  Trash2,
+  UserPlus,
+  Video,
+} from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { BarraProgresso, TimelineEtapas } from "@/components/ProgressoObra";
@@ -13,6 +22,26 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -21,7 +50,9 @@ import {
 } from "@/components/ui/select";
 import {
   adicionarEtapa,
+  atualizarObra,
   desvincularCliente,
+  excluirObra,
   obterObra,
   removerEtapa,
   salvarEtapa,
@@ -33,6 +64,7 @@ import {
   progressoDasEtapas,
   type EtapaStatus,
 } from "@/lib/obras.schemas";
+
 
 export const Route = createFileRoute("/_authenticated/obras/$id")({
   head: () => ({
@@ -84,7 +116,7 @@ function ObraPage() {
     );
   }
 
-  const { obra, etapas, clientes, atualizacoes, souEngenheiro, urls } = consulta.data;
+  const { obra, etapas, clientes, atualizacoes, souEngenheiro, souAdmin, urls } = consulta.data;
   const progresso = progressoDasEtapas(etapas);
 
   return (
@@ -92,15 +124,19 @@ function ObraPage() {
       titulo={obra.nome}
       descricao={obra.endereco || "Endereço não informado"}
       acao={
-        souEngenheiro ? (
-          <Button asChild>
-            <Link to="/obras/$id/nova-atualizacao" params={{ id }}>
-              <Plus className="mr-1 h-4 w-4" /> Nova atualização
-            </Link>
-          </Button>
-        ) : undefined
+        <div className="flex flex-wrap gap-2">
+          {souAdmin && <ObraAdmin obra={obra} onChange={recarregar} />}
+          {souEngenheiro && (
+            <Button asChild>
+              <Link to="/obras/$id/nova-atualizacao" params={{ id }}>
+                <Plus className="mr-1 h-4 w-4" /> Nova atualização
+              </Link>
+            </Button>
+          )}
+        </div>
       }
     >
+
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
           <Card className="rounded-sm border-t-4 border-t-accent">
@@ -225,6 +261,154 @@ function ObraPage() {
     </AppShell>
   );
 }
+
+/** Ações exclusivas do administrador: editar dados da obra e excluir a obra. */
+function ObraAdmin({
+  obra,
+  onChange,
+}: {
+  obra: {
+    id: string;
+    nome: string;
+    endereco: string;
+    data_inicio: string | null;
+    previsao_termino: string | null;
+  };
+  onChange: () => Promise<void>;
+}) {
+  const navigate = useNavigate();
+  const atualizar = useServerFn(atualizarObra);
+  const excluir = useServerFn(excluirObra);
+  const [aberto, setAberto] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [form, setForm] = useState({
+    nome: obra.nome,
+    endereco: obra.endereco ?? "",
+    data_inicio: obra.data_inicio ?? "",
+    previsao_termino: obra.previsao_termino ?? "",
+  });
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await atualizar({ data: { obraId: obra.id, ...form } });
+      await onChange();
+      toast.success("Obra atualizada");
+      setAberto(false);
+    } catch (erro) {
+      toast.error("Não foi possível salvar a obra", {
+        description: erro instanceof Error ? erro.message : undefined,
+      });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function apagar() {
+    setExcluindo(true);
+    try {
+      await excluir({ data: { obraId: obra.id } });
+      toast.success("Obra excluída");
+      await navigate({ to: "/admin" });
+    } catch (erro) {
+      toast.error("Não foi possível excluir a obra", {
+        description: erro instanceof Error ? erro.message : undefined,
+      });
+    } finally {
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <>
+      <Dialog open={aberto} onOpenChange={setAberto}>
+        <DialogTrigger asChild>
+          <Button variant="outline">
+            <Pencil className="mr-1 h-4 w-4" /> Editar obra
+          </Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar obra</DialogTitle>
+            <DialogDescription>Altere os dados cadastrais desta obra.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="obra-nome">Nome</Label>
+              <Input
+                id="obra-nome"
+                value={form.nome}
+                onChange={(e) => setForm({ ...form, nome: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="obra-endereco">Endereço</Label>
+              <Input
+                id="obra-endereco"
+                value={form.endereco}
+                onChange={(e) => setForm({ ...form, endereco: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="obra-inicio">Início</Label>
+                <Input
+                  id="obra-inicio"
+                  type="date"
+                  value={form.data_inicio}
+                  onChange={(e) => setForm({ ...form, data_inicio: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="obra-previsao">Previsão de término</Label>
+                <Input
+                  id="obra-previsao"
+                  type="date"
+                  value={form.previsao_termino}
+                  onChange={(e) => setForm({ ...form, previsao_termino: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAberto(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={salvar} disabled={salvando}>
+              {salvando ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive">
+            <Trash2 className="mr-1 h-4 w-4" /> Excluir obra
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir esta obra?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Todas as etapas, atualizações, fotos, vídeos, relatórios, materiais e vínculos de
+              clientes desta obra serão apagados. Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={apagar} disabled={excluindo}>
+              {excluindo ? "Excluindo..." : "Excluir obra"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+
 
 function EtapasEditaveis({
   obraId,

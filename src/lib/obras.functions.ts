@@ -734,6 +734,13 @@ export const obterObra = createServerFn({ method: "GET" })
 
     const lidas = new Set((leituras ?? []).map((l) => l.atualizacao_id));
     const souEngenheiro = obra.engenheiro_id === context.userId;
+    const { data: papelAdmin } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    const souAdmin = !!papelAdmin;
 
     const midiaPaths = (atualizacoes ?? []).flatMap((a) =>
       (a.midias ?? []).slice(0, 4).map((m) => m.path),
@@ -757,6 +764,7 @@ export const obterObra = createServerFn({ method: "GET" })
         previsao_termino: obra.previsao_termino,
       },
       souEngenheiro,
+      souAdmin,
       etapas: etapas ?? [],
       clientes,
       unidades,
@@ -801,14 +809,61 @@ export const criarObra = createServerFn({ method: "POST" })
     return { id: obra.id };
   });
 
+/** Só o administrador pode alterar ou excluir uma obra. */
+async function exigirAdmin(context: { supabase: any; userId: string }) {
+  const { data } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (!data) throw new Error("Apenas o administrador pode alterar ou excluir obras");
+}
+
+export const atualizarObra = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    criarObraSchema.extend({ obraId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await exigirAdmin(context);
+    const { error } = await context.supabase
+      .from("obras")
+      .update({
+        nome: data.nome,
+        endereco: data.endereco ?? "",
+        data_inicio: data.data_inicio || null,
+        previsao_termino: data.previsao_termino || null,
+      })
+      .eq("id", data.obraId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const excluirObra = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ obraId: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
+    await exigirAdmin(context);
+
+    // Remove os arquivos da obra no armazenamento antes de apagar os registros.
+    const { data: atualizacoes } = await context.supabase
+      .from("atualizacoes")
+      .select("id, excel_path, midias(path)")
+      .eq("obra_id", data.obraId);
+    const arquivos = (atualizacoes ?? []).flatMap((a: any) => [
+      ...(a.excel_path ? [a.excel_path] : []),
+      ...((a.midias ?? []) as { path: string }[]).map((m) => m.path),
+    ]);
+    if (arquivos.length > 0) {
+      await context.supabase.storage.from("obras").remove(arquivos);
+    }
+
     const { error } = await context.supabase.from("obras").delete().eq("id", data.obraId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const vincularCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
