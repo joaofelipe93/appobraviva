@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { CalendarDays, CheckCircle2, FileSpreadsheet, Trash2, UserRound } from "lucide-react";
+import { CalendarDays, CheckCircle2, FileSpreadsheet, Pencil, Trash2, UserRound } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
