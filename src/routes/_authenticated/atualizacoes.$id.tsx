@@ -72,12 +72,17 @@ function AtualizacaoPage() {
   const obterFn = useServerFn(obterAtualizacao);
   const gerarFn = useServerFn(gerarResumoRelatorio);
   const excluirFn = useServerFn(excluirAtualizacao);
+  const salvarFn = useServerFn(atualizarAtualizacao);
   const [gerando, setGerando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [editando, setEditando] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [formData, setFormData] = useState({ data_visita: "", observacoes: "" });
   const consulta = useQuery({
     queryKey: ["atualizacao", id],
     queryFn: () => obterFn({ data: { atualizacaoId: id } }),
   });
+
 
   if (consulta.isLoading) {
     return (
