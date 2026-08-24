@@ -84,7 +84,7 @@ function ObraPage() {
     );
   }
 
-  const { obra, etapas, clientes, atualizacoes, souEngenheiro, urls } = consulta.data;
+  const { obra, etapas, clientes, atualizacoes, souEngenheiro, souAdmin, urls } = consulta.data;
   const progresso = progressoDasEtapas(etapas);
 
   return (
@@ -92,15 +92,19 @@ function ObraPage() {
       titulo={obra.nome}
       descricao={obra.endereco || "Endereço não informado"}
       acao={
-        souEngenheiro ? (
-          <Button asChild>
-            <Link to="/obras/$id/nova-atualizacao" params={{ id }}>
-              <Plus className="mr-1 h-4 w-4" /> Nova atualização
-            </Link>
-          </Button>
-        ) : undefined
+        <div className="flex flex-wrap gap-2">
+          {souAdmin && <ObraAdmin obra={obra} onChange={recarregar} />}
+          {souEngenheiro && (
+            <Button asChild>
+              <Link to="/obras/$id/nova-atualizacao" params={{ id }}>
+                <Plus className="mr-1 h-4 w-4" /> Nova atualização
+              </Link>
+            </Button>
+          )}
+        </div>
       }
     >
+
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
           <Card className="rounded-sm border-t-4 border-t-accent">
