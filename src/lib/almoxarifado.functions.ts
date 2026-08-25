@@ -47,7 +47,8 @@ export const buscarMaterialPorCodigo = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => buscaCodigoSchema.parse(input))
   .handler(async ({ data, context }) => {
     await exigirEquipe(context);
-    const codigo = normalizarCodigo(data.codigo);
+    // Somente caracteres seguros: o valor entra em um filtro `or` do PostgREST.
+    const codigo = normalizarCodigo(data.codigo).replace(/[^A-Z0-9._-]/g, "");
     if (!codigo) return { encontrado: false as const, codigo };
 
     const { data: materiais, error } = await context.supabase
@@ -62,23 +63,26 @@ export const buscarMaterialPorCodigo = createServerFn({ method: "POST" })
     return { encontrado: true as const, codigo, material: montarMaterial(bruto) };
   });
 
-
 export const criarMaterial = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => materialSchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("materiais").insert({
-      
-      nome: data.nome,
-      categoria: data.categoria,
-      unidade_medida: data.unidadeMedida,
-      custo_unitario: data.custoUnitario,
-      fornecedor: data.fornecedor,
-      estoque_minimo: data.estoqueMinimo,
-      observacoes: data.observacoes,
-    });
+    const { data: criado, error } = await context.supabase
+      .from("materiais")
+      .insert({
+        nome: data.nome,
+        categoria: data.categoria,
+        unidade_medida: data.unidadeMedida,
+        custo_unitario: data.custoUnitario,
+        fornecedor: data.fornecedor,
+        estoque_minimo: data.estoqueMinimo,
+        observacoes: data.observacoes,
+        codigo_barras: data.codigoBarras ? data.codigoBarras.toUpperCase() : null,
+      })
+      .select("id, codigo_interno, codigo_barras")
+      .single();
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, material: criado };
   });
 
 export const atualizarMaterial = createServerFn({ method: "POST" })
@@ -95,11 +99,13 @@ export const atualizarMaterial = createServerFn({ method: "POST" })
         fornecedor: data.fornecedor,
         estoque_minimo: data.estoqueMinimo,
         observacoes: data.observacoes,
+        codigo_barras: data.codigoBarras ? data.codigoBarras.toUpperCase() : null,
       })
       .eq("id", data.materialId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
 
 export const excluirMaterial = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
