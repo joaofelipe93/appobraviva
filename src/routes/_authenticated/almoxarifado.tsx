@@ -415,6 +415,8 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
             }
           />
           <EditarMaterial item={item} onPronto={onPronto} />
+          <EtiquetaMaterial item={item} />
+
           <Button size="sm" variant="ghost" onClick={() => setAberto((v) => !v)}>
             {aberto ? "Ocultar" : `Movimentações (${item.movimentacoes.length})`}
           </Button>
