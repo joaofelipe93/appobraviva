@@ -89,7 +89,6 @@ export type MaterialComSaldo = {
   codigo_barras: string;
   categoria: string;
 
-  categoria: string;
   unidade_medida: string;
   custo_unitario: number | null;
   fornecedor: string;
