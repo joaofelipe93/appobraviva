@@ -85,6 +85,10 @@ export type MovimentacaoItem = {
 export type MaterialComSaldo = {
   id: string;
   nome: string;
+  codigo_interno: string;
+  codigo_barras: string;
+  categoria: string;
+
   categoria: string;
   unidade_medida: string;
   custo_unitario: number | null;
