@@ -37,12 +37,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  acessoAlmoxarifado,
   atualizarMaterial,
   criarMaterial,
   excluirMaterial,
   excluirMovimentacao,
   listarEstoque,
-  obrasDoAlmoxarifado,
   registrarMovimentacao,
 } from "@/lib/almoxarifado.functions";
 import {
