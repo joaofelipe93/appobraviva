@@ -582,6 +582,16 @@ function CamposMaterial({
         />
       </div>
       <div className="space-y-1.5 sm:col-span-2">
+        <Label>Código de barras do fabricante (opcional)</Label>
+        <Input
+          value={form.codigoBarras}
+          onChange={(e) => setForm({ ...form, codigoBarras: e.target.value })}
+          placeholder="7891234567895"
+          inputMode="text"
+          autoComplete="off"
+        />
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
         <Label>Observações</Label>
         <Textarea
           value={form.observacoes}
@@ -593,8 +603,29 @@ function CamposMaterial({
   );
 }
 
-function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false);
+function NovoMaterial({
+  onPronto,
+  semGatilho,
+  aberto: abertoProp,
+  onOpenChange,
+  codigoBarrasInicial = "",
+  onCriado,
+}: {
+  onPronto: () => Promise<void>;
+  semGatilho?: boolean;
+  aberto?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  codigoBarrasInicial?: string;
+  onCriado?: (codigoInterno: string) => Promise<void> | void;
+}) {
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const controlado = abertoProp !== undefined;
+  const aberto = controlado ? abertoProp : abertoLocal;
+  const definirAberto = (v: boolean) => {
+    if (controlado) onOpenChange?.(v);
+    else setAbertoLocal(v);
+    if (v) setForm({ ...FORM_VAZIO, codigoBarras: codigoBarrasInicial });
+  };
   const [form, setForm] = useState<FormMaterial>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const criarFn = useServerFn(criarMaterial);
@@ -602,9 +633,8 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   async function salvar() {
     setSalvando(true);
     try {
-      await criarFn({
+      const resposta = await criarFn({
         data: {
-          
           nome: form.nome,
           categoria: form.categoria,
           unidadeMedida: form.unidadeMedida,
@@ -612,12 +642,16 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
           fornecedor: form.fornecedor,
           estoqueMinimo: numeroOuNulo(form.estoqueMinimo) ?? 0,
           observacoes: form.observacoes,
+          codigoBarras: form.codigoBarras,
         },
       });
-      toast.success("Material cadastrado.");
+      toast.success(`Material cadastrado (${resposta.material?.codigo_interno ?? "novo código"}).`);
       setForm(FORM_VAZIO);
-      setAberto(false);
+      definirAberto(false);
       await onPronto();
+      if (onCriado && resposta.material?.codigo_interno) {
+        await onCriado(resposta.material.codigo_interno);
+      }
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não foi possível cadastrar.");
     } finally {
@@ -626,16 +660,20 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-1 h-4 w-4" /> Novo material
-        </Button>
-      </DialogTrigger>
+    <Dialog open={aberto} onOpenChange={definirAberto}>
+      {!semGatilho && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="mr-1 h-4 w-4" /> Novo material
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo material</DialogTitle>
-          <DialogDescription>Cadastre o item no armazém geral.</DialogDescription>
+          <DialogDescription>
+            Cadastre o item no armazém geral. O código da etiqueta QR é gerado automaticamente.
+          </DialogDescription>
         </DialogHeader>
         <CamposMaterial form={form} setForm={setForm} />
         <Button onClick={salvar} disabled={salvando || form.nome.trim().length < 2}>
@@ -645,6 +683,7 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
     </Dialog>
   );
 }
+
 
 function EditarMaterial({
   item,
