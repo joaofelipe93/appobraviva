@@ -90,7 +90,7 @@ export const criarMaterial = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => materialSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("materiais").insert({
-      obra_id: data.obraId,
+      
       nome: data.nome,
       categoria: data.categoria,
       unidade_medida: data.unidadeMedida,
