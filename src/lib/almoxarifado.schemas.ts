@@ -25,7 +25,7 @@ export const materialSchema = z.object({
   observacoes: z.string().trim().max(500).default(""),
 });
 
-export const materialUpdateSchema = materialSchema.omit({ obraId: true }).extend({
+export const materialUpdateSchema = materialSchema.extend({
   materialId: z.string().uuid(),
 });
 
