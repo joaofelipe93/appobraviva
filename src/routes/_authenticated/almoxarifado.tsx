@@ -505,7 +505,7 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo material</DialogTitle>
-          <DialogDescription>Cadastre o item no almoxarifado desta obra.</DialogDescription>
+          <DialogDescription>Cadastre o item no armazém geral.</DialogDescription>
         </DialogHeader>
         <CamposMaterial form={form} setForm={setForm} />
         <Button onClick={salvar} disabled={salvando || form.nome.trim().length < 2}>
