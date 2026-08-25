@@ -702,6 +702,7 @@ function EditarMaterial({
     fornecedor: item.fornecedor,
     estoqueMinimo: String(item.estoque_minimo),
     observacoes: item.observacoes,
+    codigoBarras: item.codigo_barras,
   });
   const atualizarFn = useServerFn(atualizarMaterial);
 
@@ -718,8 +719,10 @@ function EditarMaterial({
           fornecedor: form.fornecedor,
           estoqueMinimo: numeroOuNulo(form.estoqueMinimo) ?? 0,
           observacoes: form.observacoes,
+          codigoBarras: form.codigoBarras,
         },
       });
+
       toast.success("Material atualizado.");
       setAberto(false);
       await onPronto();
