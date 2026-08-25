@@ -37,12 +37,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  acessoAlmoxarifado,
   atualizarMaterial,
   criarMaterial,
   excluirMaterial,
   excluirMovimentacao,
   listarEstoque,
-  obrasDoAlmoxarifado,
   registrarMovimentacao,
 } from "@/lib/almoxarifado.functions";
 import {
@@ -60,12 +60,12 @@ export const Route = createFileRoute("/_authenticated/almoxarifado")({
       {
         name: "description",
         content:
-          "Controle de estoque por obra: materiais, entradas de compra, saídas de consumo, custos e fornecedores.",
+          "Armazém geral: materiais, entradas de compra, saídas de consumo, custos e fornecedores em um único estoque.",
       },
       { property: "og:title", content: "Almoxarifado — ObraViva" },
       {
         property: "og:description",
-        content: "Materiais, entradas, saídas e saldo de estoque de cada obra.",
+        content: "Materiais, entradas, saídas e saldo do estoque geral.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -75,24 +75,21 @@ export const Route = createFileRoute("/_authenticated/almoxarifado")({
 });
 
 function AlmoxarifadoPage() {
-  const obrasFn = useServerFn(obrasDoAlmoxarifado);
+  const acessoFn = useServerFn(acessoAlmoxarifado);
   const estoqueFn = useServerFn(listarEstoque);
   const queryClient = useQueryClient();
-  const [obraId, setObraId] = useState<string>("");
   const [busca, setBusca] = useState("");
 
-  const obras = useQuery({ queryKey: ["almoxarifado-obras"], queryFn: () => obrasFn({}) });
-
-  const obraAtual = obraId || obras.data?.obras[0]?.id || "";
+  const acesso = useQuery({ queryKey: ["almoxarifado-acesso"], queryFn: () => acessoFn({}) });
 
   const estoque = useQuery({
-    queryKey: ["almoxarifado", obraAtual],
-    queryFn: () => estoqueFn({ data: { obraId: obraAtual } }),
-    enabled: !!obraAtual,
+    queryKey: ["almoxarifado"],
+    queryFn: () => estoqueFn({}),
+    enabled: !!acesso.data,
   });
 
   async function recarregar() {
-    await queryClient.invalidateQueries({ queryKey: ["almoxarifado", obraAtual] });
+    await queryClient.invalidateQueries({ queryKey: ["almoxarifado"] });
   }
 
   const itens = useMemo(() => {
@@ -104,7 +101,7 @@ function AlmoxarifadoPage() {
     );
   }, [estoque.data, busca]);
 
-  if (obras.isLoading) {
+  if (acesso.isLoading) {
     return (
       <AppShell titulo="Almoxarifado">
         <Skeleton className="h-40 w-full" />
@@ -112,7 +109,7 @@ function AlmoxarifadoPage() {
     );
   }
 
-  if (obras.error) {
+  if (acesso.error) {
     return (
       <AppShell
         titulo="Almoxarifado"
@@ -125,91 +122,64 @@ function AlmoxarifadoPage() {
     );
   }
 
-  const listaObras = obras.data?.obras ?? [];
-
   return (
     <AppShell
       titulo="Almoxarifado"
-      descricao="Controle de materiais, entradas de compra e saídas de consumo por obra."
-      acao={obraAtual ? <NovoMaterial obraId={obraAtual} onPronto={recarregar} /> : undefined}
+      descricao="Armazém geral de materiais: entradas de compra e saídas de consumo em um único estoque."
+      acao={<NovoMaterial onPronto={recarregar} />}
     >
-      {listaObras.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            Nenhuma obra disponível. Cadastre uma obra para usar o almoxarifado.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="space-y-1.5">
-              <Label>Obra</Label>
-              <Select value={obraAtual} onValueChange={setObraId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a obra" />
-                </SelectTrigger>
-                <SelectContent>
-                  {listaObras.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="busca-material">Buscar material</Label>
-              <Input
-                id="busca-material"
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Nome, categoria ou fornecedor"
+      <div className="space-y-6">
+        <div className="space-y-1.5 sm:max-w-md">
+          <Label htmlFor="busca-material">Buscar material</Label>
+          <Input
+            id="busca-material"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Nome, categoria ou fornecedor"
+          />
+        </div>
+
+        {estoque.isLoading ? (
+          <Skeleton className="h-40 w-full" />
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Indicador
+                icone={<Package className="h-4 w-4" />}
+                rotulo="Materiais"
+                valor={String(estoque.data?.totalMateriais ?? 0)}
+              />
+              <Indicador
+                icone={<Boxes className="h-4 w-4" />}
+                rotulo="Valor em estoque"
+                valor={formatarMoeda(estoque.data?.valorTotal ?? 0)}
+              />
+              <Indicador
+                icone={<AlertTriangle className="h-4 w-4" />}
+                rotulo="Abaixo do mínimo"
+                valor={String(estoque.data?.alertas ?? 0)}
+                alerta={(estoque.data?.alertas ?? 0) > 0}
               />
             </div>
-          </div>
 
-          {estoque.isLoading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Indicador
-                  icone={<Package className="h-4 w-4" />}
-                  rotulo="Materiais"
-                  valor={String(estoque.data?.totalMateriais ?? 0)}
-                />
-                <Indicador
-                  icone={<Boxes className="h-4 w-4" />}
-                  rotulo="Valor em estoque"
-                  valor={formatarMoeda(estoque.data?.valorTotal ?? 0)}
-                />
-                <Indicador
-                  icone={<AlertTriangle className="h-4 w-4" />}
-                  rotulo="Abaixo do mínimo"
-                  valor={String(estoque.data?.alertas ?? 0)}
-                  alerta={(estoque.data?.alertas ?? 0) > 0}
-                />
+            {itens.length === 0 ? (
+              <Card>
+                <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                  {busca
+                    ? "Nenhum material encontrado para esta busca."
+                    : "Nenhum material cadastrado no armazém ainda."}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {itens.map((item) => (
+                  <MaterialCard key={item.id} item={item} onPronto={recarregar} />
+                ))}
               </div>
-
-              {itens.length === 0 ? (
-                <Card>
-                  <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                    {busca
-                      ? "Nenhum material encontrado para esta busca."
-                      : "Nenhum material cadastrado nesta obra ainda."}
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-3">
-                  {itens.map((item) => (
-                    <MaterialCard key={item.id} item={item} onPronto={recarregar} />
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </>
+        )}
+      </div>
     </AppShell>
   );
 }
@@ -493,7 +463,7 @@ function CamposMaterial({
   );
 }
 
-function NovoMaterial({ obraId, onPronto }: { obraId: string; onPronto: () => Promise<void> }) {
+function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   const [aberto, setAberto] = useState(false);
   const [form, setForm] = useState<FormMaterial>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
@@ -504,7 +474,7 @@ function NovoMaterial({ obraId, onPronto }: { obraId: string; onPronto: () => Pr
     try {
       await criarFn({
         data: {
-          obraId,
+          
           nome: form.nome,
           categoria: form.categoria,
           unidadeMedida: form.unidadeMedida,
@@ -535,7 +505,7 @@ function NovoMaterial({ obraId, onPronto }: { obraId: string; onPronto: () => Pr
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo material</DialogTitle>
-          <DialogDescription>Cadastre o item no almoxarifado desta obra.</DialogDescription>
+          <DialogDescription>Cadastre o item no armazém geral.</DialogDescription>
         </DialogHeader>
         <CamposMaterial form={form} setForm={setForm} />
         <Button onClick={salvar} disabled={salvando || form.nome.trim().length < 2}>

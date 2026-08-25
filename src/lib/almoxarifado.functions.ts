@@ -8,51 +8,38 @@ import {
 } from "./almoxarifado.schemas";
 import type { MaterialComSaldo, MovimentacaoItem } from "./almoxarifado.schemas";
 
-const obraIdSchema = z.object({ obraId: z.string().uuid() });
 const idSchema = z.object({ id: z.string().uuid() });
 
-/** Obras que o usuário pode gerenciar no almoxarifado (engenheiro dono ou admin). */
-export const obrasDoAlmoxarifado = createServerFn({ method: "GET" })
+/** Confirma que o usuário é engenheiro ou administrador (únicos com acesso ao armazém). */
+async function exigirEquipe(context: { supabase: any; userId: string }) {
+  const { data: papeis } = await context.supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", context.userId);
+  const papel = (papeis?.[0]?.role ?? null) as "engenheiro" | "cliente" | "admin" | null;
+  if (papel !== "engenheiro" && papel !== "admin") {
+    throw new Error("Apenas engenheiros e administradores acessam o almoxarifado.");
+  }
+  return papel;
+}
+
+/** Papel do usuário no armazém geral. */
+export const acessoAlmoxarifado = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: papeis } = await context.supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", context.userId);
-    const papel = papeis?.[0]?.role ?? null;
-    if (papel !== "engenheiro" && papel !== "admin") {
-      throw new Error("Apenas engenheiros e administradores acessam o almoxarifado.");
-    }
-
-    if (papel === "admin") {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin
-        .from("obras")
-        .select("id, nome")
-        .order("nome", { ascending: true });
-      if (error) throw new Error(error.message);
-      return { papel, obras: data ?? [] };
-    }
-
-    const { data, error } = await context.supabase
-      .from("obras")
-      .select("id, nome")
-      .eq("engenheiro_id", context.userId)
-      .order("nome", { ascending: true });
-    if (error) throw new Error(error.message);
-    return { papel, obras: data ?? [] };
+    const papel = await exigirEquipe(context);
+    return { papel };
   });
 
 export const listarEstoque = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => obraIdSchema.parse(input))
-  .handler(async ({ data, context }) => {
+  .handler(async ({ context }) => {
+    await exigirEquipe(context);
     const { data: materiais, error } = await context.supabase
       .from("materiais")
       .select(
         "id, nome, categoria, unidade_medida, custo_unitario, fornecedor, estoque_minimo, observacoes, movimentacoes_estoque(id, tipo, quantidade, custo_unitario, fornecedor, nota_fiscal, responsavel, observacoes, data_movimento, created_at)",
       )
-      .eq("obra_id", data.obraId)
       .order("nome", { ascending: true });
     if (error) throw new Error(error.message);
 
@@ -103,7 +90,7 @@ export const criarMaterial = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => materialSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("materiais").insert({
-      obra_id: data.obraId,
+      
       nome: data.nome,
       categoria: data.categoria,
       unidade_medida: data.unidadeMedida,

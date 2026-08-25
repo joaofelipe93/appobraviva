@@ -16,7 +16,6 @@ export const UNIDADES_MEDIDA = [
 ] as const;
 
 export const materialSchema = z.object({
-  obraId: z.string().uuid(),
   nome: z.string().trim().min(2, "Informe o nome do material"),
   categoria: z.string().trim().max(60).default(""),
   unidadeMedida: z.string().trim().min(1).max(10).default("un"),
@@ -26,7 +25,7 @@ export const materialSchema = z.object({
   observacoes: z.string().trim().max(500).default(""),
 });
 
-export const materialUpdateSchema = materialSchema.omit({ obraId: true }).extend({
+export const materialUpdateSchema = materialSchema.extend({
   materialId: z.string().uuid(),
 });
 
