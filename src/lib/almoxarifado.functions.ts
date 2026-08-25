@@ -8,63 +8,10 @@ import {
   movimentacaoSchema,
   normalizarCodigo,
 } from "./almoxarifado.schemas";
-import type { MaterialComSaldo, MovimentacaoItem } from "./almoxarifado.schemas";
+import type { MaterialComSaldo } from "./almoxarifado.schemas";
+import { CAMPOS_MATERIAL, exigirEquipe, montarMaterial } from "./almoxarifado.server";
 
 const idSchema = z.object({ id: z.string().uuid() });
-
-const CAMPOS_MATERIAL =
-  "id, nome, codigo_interno, codigo_barras, categoria, unidade_medida, custo_unitario, fornecedor, estoque_minimo, observacoes, movimentacoes_estoque(id, tipo, quantidade, custo_unitario, fornecedor, nota_fiscal, responsavel, observacoes, data_movimento, created_at)";
-
-/** Converte a linha do banco (material + movimentações) no item com saldo usado na tela. */
-function montarMaterial(m: any): MaterialComSaldo {
-  const movimentacoes = ((m.movimentacoes_estoque ?? []) as MovimentacaoItem[])
-    .map((mv) => ({ ...mv, quantidade: Number(mv.quantidade) }))
-    .sort((a, b) =>
-      a.data_movimento === b.data_movimento
-        ? b.created_at.localeCompare(a.created_at)
-        : b.data_movimento.localeCompare(a.data_movimento),
-    );
-  const entradas = movimentacoes
-    .filter((mv) => mv.tipo === "entrada")
-    .reduce((soma, mv) => soma + mv.quantidade, 0);
-  const saidas = movimentacoes
-    .filter((mv) => mv.tipo === "saida")
-    .reduce((soma, mv) => soma + mv.quantidade, 0);
-  const saldo = entradas - saidas;
-  const custo = m.custo_unitario === null ? null : Number(m.custo_unitario);
-  return {
-    id: m.id,
-    nome: m.nome,
-    codigo_interno: m.codigo_interno ?? "",
-    codigo_barras: m.codigo_barras ?? "",
-    categoria: m.categoria,
-    unidade_medida: m.unidade_medida,
-    custo_unitario: custo,
-    fornecedor: m.fornecedor,
-    estoque_minimo: Number(m.estoque_minimo),
-    observacoes: m.observacoes,
-    entradas,
-    saidas,
-    saldo,
-    valorEstoque: custo === null ? 0 : saldo * custo,
-    abaixoDoMinimo: Number(m.estoque_minimo) > 0 && saldo < Number(m.estoque_minimo),
-    movimentacoes,
-  };
-}
-
-
-/** Confirma que o usuário é engenheiro ou administrador (únicos com acesso ao armazém). */
-async function exigirEquipe(context: { supabase: any; userId: string }) {
-  const { data: papeis } = await context.supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", context.userId);
-  const papel = (papeis?.[0]?.role ?? null) as "engenheiro" | "cliente" | "admin" | null;
-  if (papel !== "engenheiro" && papel !== "admin") {
-    throw new Error("Apenas engenheiros e administradores acessam o almoxarifado.");
-  }
-  return papel;
-}
 
 /** Papel do usuário no armazém geral. */
 export const acessoAlmoxarifado = createServerFn({ method: "GET" })
@@ -80,45 +27,11 @@ export const listarEstoque = createServerFn({ method: "GET" })
     await exigirEquipe(context);
     const { data: materiais, error } = await context.supabase
       .from("materiais")
-      .select(
-        "id, nome, categoria, unidade_medida, custo_unitario, fornecedor, estoque_minimo, observacoes, movimentacoes_estoque(id, tipo, quantidade, custo_unitario, fornecedor, nota_fiscal, responsavel, observacoes, data_movimento, created_at)",
-      )
+      .select(CAMPOS_MATERIAL)
       .order("nome", { ascending: true });
     if (error) throw new Error(error.message);
 
-    const itens: MaterialComSaldo[] = (materiais ?? []).map((m) => {
-      const movimentacoes = ((m.movimentacoes_estoque ?? []) as MovimentacaoItem[])
-        .map((mv) => ({ ...mv, quantidade: Number(mv.quantidade) }))
-        .sort((a, b) =>
-          a.data_movimento === b.data_movimento
-            ? b.created_at.localeCompare(a.created_at)
-            : b.data_movimento.localeCompare(a.data_movimento),
-        );
-      const entradas = movimentacoes
-        .filter((mv) => mv.tipo === "entrada")
-        .reduce((soma, mv) => soma + mv.quantidade, 0);
-      const saidas = movimentacoes
-        .filter((mv) => mv.tipo === "saida")
-        .reduce((soma, mv) => soma + mv.quantidade, 0);
-      const saldo = entradas - saidas;
-      const custo = m.custo_unitario === null ? null : Number(m.custo_unitario);
-      return {
-        id: m.id,
-        nome: m.nome,
-        categoria: m.categoria,
-        unidade_medida: m.unidade_medida,
-        custo_unitario: custo,
-        fornecedor: m.fornecedor,
-        estoque_minimo: Number(m.estoque_minimo),
-        observacoes: m.observacoes,
-        entradas,
-        saidas,
-        saldo,
-        valorEstoque: custo === null ? 0 : saldo * custo,
-        abaixoDoMinimo: Number(m.estoque_minimo) > 0 && saldo < Number(m.estoque_minimo),
-        movimentacoes,
-      };
-    });
+    const itens: MaterialComSaldo[] = (materiais ?? []).map(montarMaterial);
 
     return {
       itens,
@@ -127,6 +40,28 @@ export const listarEstoque = createServerFn({ method: "GET" })
       alertas: itens.filter((i) => i.abaixoDoMinimo).length,
     };
   });
+
+/** Busca um material pelo código interno (QR) ou pelo código de barras do fabricante. */
+export const buscarMaterialPorCodigo = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => buscaCodigoSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await exigirEquipe(context);
+    const codigo = normalizarCodigo(data.codigo);
+    if (!codigo) return { encontrado: false as const, codigo };
+
+    const { data: materiais, error } = await context.supabase
+      .from("materiais")
+      .select(CAMPOS_MATERIAL)
+      .or(`codigo_interno.eq.${codigo},codigo_barras.eq.${codigo}`)
+      .limit(1);
+    if (error) throw new Error(error.message);
+
+    const bruto = (materiais ?? [])[0];
+    if (!bruto) return { encontrado: false as const, codigo };
+    return { encontrado: true as const, codigo, material: montarMaterial(bruto) };
+  });
+
 
 export const criarMaterial = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
