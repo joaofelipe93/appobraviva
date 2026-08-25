@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -10,6 +10,7 @@ import {
   Package,
   Pencil,
   Plus,
+  ScanLine,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,9 +37,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LeitorCodigo } from "@/components/almoxarifado/leitor-codigo";
+import {
+  EtiquetaMaterial,
+  ImprimirTodasEtiquetas,
+} from "@/components/almoxarifado/etiqueta-material";
 import {
   acessoAlmoxarifado,
   atualizarMaterial,
+  buscarMaterialPorCodigo,
   criarMaterial,
   excluirMaterial,
   excluirMovimentacao,
@@ -52,6 +59,7 @@ import {
   formatarQuantidade,
 } from "@/lib/almoxarifado.schemas";
 import type { MaterialComSaldo } from "@/lib/almoxarifado.schemas";
+
 
 export const Route = createFileRoute("/_authenticated/almoxarifado")({
   head: () => ({
