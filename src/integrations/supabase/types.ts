@@ -143,7 +143,6 @@ export type Database = {
           fornecedor: string
           id: string
           nome: string
-          obra_id: string
           observacoes: string
           unidade_medida: string
           updated_at: string
@@ -156,7 +155,6 @@ export type Database = {
           fornecedor?: string
           id?: string
           nome: string
-          obra_id: string
           observacoes?: string
           unidade_medida?: string
           updated_at?: string
@@ -169,20 +167,11 @@ export type Database = {
           fornecedor?: string
           id?: string
           nome?: string
-          obra_id?: string
           observacoes?: string
           unidade_medida?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "obras"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       midias: {
         Row: {
