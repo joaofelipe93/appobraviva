@@ -491,6 +491,7 @@ type FormMaterial = {
   fornecedor: string;
   estoqueMinimo: string;
   observacoes: string;
+  codigoBarras: string;
 };
 
 const FORM_VAZIO: FormMaterial = {
@@ -501,7 +502,9 @@ const FORM_VAZIO: FormMaterial = {
   fornecedor: "",
   estoqueMinimo: "0",
   observacoes: "",
+  codigoBarras: "",
 };
+
 
 function numeroOuNulo(valor: string): number | null {
   const limpo = valor.replace(",", ".").trim();
