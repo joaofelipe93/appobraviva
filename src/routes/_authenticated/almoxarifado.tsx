@@ -759,16 +759,28 @@ function MovimentacaoDialog({
   tipo,
   gatilho,
   onPronto,
+  aberto: abertoProp,
+  onOpenChange,
+  onTipoChange,
 }: {
   material: MaterialComSaldo;
   tipo: "entrada" | "saida";
-  gatilho: React.ReactNode;
+  gatilho?: React.ReactNode;
   onPronto: () => Promise<void>;
+  aberto?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  onTipoChange?: (t: "entrada" | "saida") => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
-  const [aberto, setAberto] = useState(false);
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const controlado = abertoProp !== undefined;
+  const aberto = controlado ? abertoProp : abertoLocal;
+  const definirAberto = (v: boolean) => {
+    if (controlado) onOpenChange?.(v);
+    else setAbertoLocal(v);
+  };
   const [salvando, setSalvando] = useState(false);
-  const [quantidade, setQuantidade] = useState("");
+  const [quantidade, setQuantidade] = useState(controlado ? "1" : "");
   const [custo, setCusto] = useState(
     tipo === "entrada" && material.custo_unitario !== null ? String(material.custo_unitario) : "",
   );
@@ -801,10 +813,10 @@ function MovimentacaoDialog({
         },
       });
       toast.success(tipo === "entrada" ? "Entrada registrada." : "Saída registrada.");
-      setQuantidade("");
+      setQuantidade(controlado ? "1" : "");
       setNotaFiscal("");
       setObservacoes("");
-      setAberto(false);
+      definirAberto(false);
       await onPronto();
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não foi possível registrar.");
@@ -814,19 +826,41 @@ function MovimentacaoDialog({
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
-      <DialogTrigger asChild>{gatilho}</DialogTrigger>
+    <Dialog open={aberto} onOpenChange={definirAberto}>
+      {gatilho && <DialogTrigger asChild>{gatilho}</DialogTrigger>}
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {tipo === "entrada" ? "Entrada de material" : "Saída de material"}
           </DialogTitle>
           <DialogDescription>
-            {material.nome} · saldo atual {formatarQuantidade(material.saldo)}{" "}
-            {material.unidade_medida}
+            {material.nome} · {material.codigo_interno} · saldo atual{" "}
+            {formatarQuantidade(material.saldo)} {material.unidade_medida}
+            {material.abaixoDoMinimo ? " · abaixo do mínimo" : ""}
           </DialogDescription>
         </DialogHeader>
+        {onTipoChange && (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              className="flex-1"
+              variant={tipo === "entrada" ? "default" : "outline"}
+              onClick={() => onTipoChange("entrada")}
+            >
+              <ArrowDownCircle className="mr-1 h-4 w-4" /> Entrada
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              variant={tipo === "saida" ? "default" : "outline"}
+              onClick={() => onTipoChange("saida")}
+            >
+              <ArrowUpCircle className="mr-1 h-4 w-4" /> Saída
+            </Button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
+
           <div className="space-y-1.5">
             <Label>Quantidade ({material.unidade_medida})</Label>
             <Input
