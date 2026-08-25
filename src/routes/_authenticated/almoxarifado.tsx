@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowDownCircle,
@@ -10,6 +10,7 @@ import {
   Package,
   Pencil,
   Plus,
+  ScanLine,
   Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,9 +37,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LeitorCodigo } from "@/components/almoxarifado/leitor-codigo";
+import {
+  EtiquetaMaterial,
+  ImprimirTodasEtiquetas,
+} from "@/components/almoxarifado/etiqueta-material";
 import {
   acessoAlmoxarifado,
   atualizarMaterial,
+  buscarMaterialPorCodigo,
   criarMaterial,
   excluirMaterial,
   excluirMovimentacao,
@@ -52,6 +59,7 @@ import {
   formatarQuantidade,
 } from "@/lib/almoxarifado.schemas";
 import type { MaterialComSaldo } from "@/lib/almoxarifado.schemas";
+
 
 export const Route = createFileRoute("/_authenticated/almoxarifado")({
   head: () => ({
@@ -77,8 +85,14 @@ export const Route = createFileRoute("/_authenticated/almoxarifado")({
 function AlmoxarifadoPage() {
   const acessoFn = useServerFn(acessoAlmoxarifado);
   const estoqueFn = useServerFn(listarEstoque);
+  const buscarCodigoFn = useServerFn(buscarMaterialPorCodigo);
   const queryClient = useQueryClient();
   const [busca, setBusca] = useState("");
+  const [leitorAberto, setLeitorAberto] = useState(false);
+  const [scan, setScan] = useState<MaterialComSaldo | null>(null);
+  const [tipoScan, setTipoScan] = useState<"entrada" | "saida">("saida");
+  const [codigoDesconhecido, setCodigoDesconhecido] = useState<string | null>(null);
+  const [cadastroScan, setCadastroScan] = useState(false);
 
   const acesso = useQuery({ queryKey: ["almoxarifado-acesso"], queryFn: () => acessoFn({}) });
 
@@ -88,16 +102,40 @@ function AlmoxarifadoPage() {
     enabled: !!acesso.data,
   });
 
-  async function recarregar() {
+  const recarregar = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["almoxarifado"] });
-  }
+  }, [queryClient]);
+
+  /** Consulta o código no banco e abre a movimentação do material correspondente. */
+  const abrirPorCodigo = useCallback(
+    async (codigo: string, tipo: "entrada" | "saida" = "saida") => {
+      try {
+        const resposta = await buscarCodigoFn({ data: { codigo } });
+        setLeitorAberto(false);
+        if (resposta.encontrado) {
+          setTipoScan(tipo);
+          setScan(resposta.material);
+          setCodigoDesconhecido(null);
+        } else {
+          setScan(null);
+          setCodigoDesconhecido(resposta.codigo || codigo);
+        }
+      } catch (erro) {
+        toast.error(erro instanceof Error ? erro.message : "Não foi possível buscar o código.");
+      }
+    },
+    [buscarCodigoFn],
+  );
 
   const itens = useMemo(() => {
     const lista = estoque.data?.itens ?? [];
     const termo = busca.trim().toLowerCase();
     if (!termo) return lista;
     return lista.filter((i) =>
-      [i.nome, i.categoria, i.fornecedor].join(" ").toLowerCase().includes(termo),
+      [i.nome, i.categoria, i.fornecedor, i.codigo_interno, i.codigo_barras]
+        .join(" ")
+        .toLowerCase()
+        .includes(termo),
     );
   }, [estoque.data, busca]);
 
@@ -126,17 +164,30 @@ function AlmoxarifadoPage() {
     <AppShell
       titulo="Almoxarifado"
       descricao="Armazém geral de materiais: entradas de compra e saídas de consumo em um único estoque."
-      acao={<NovoMaterial onPronto={recarregar} />}
+      acao={
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setLeitorAberto(true)}>
+            <ScanLine className="mr-1 h-4 w-4" /> Ler código
+          </Button>
+          <NovoMaterial onPronto={recarregar} />
+        </div>
+      }
     >
       <div className="space-y-6">
-        <div className="space-y-1.5 sm:max-w-md">
-          <Label htmlFor="busca-material">Buscar material</Label>
-          <Input
-            id="busca-material"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Nome, categoria ou fornecedor"
-          />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-md">
+            <Label htmlFor="busca-material">Buscar material</Label>
+            <Input
+              id="busca-material"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && busca.trim()) void abrirPorCodigo(busca.trim());
+              }}
+              placeholder="Nome, categoria, fornecedor ou código"
+            />
+          </div>
+          <ImprimirTodasEtiquetas itens={itens} />
         </div>
 
         {estoque.isLoading ? (
@@ -180,9 +231,75 @@ function AlmoxarifadoPage() {
           </>
         )}
       </div>
+
+      <ClientOnly fallback={null}>
+        <LeitorCodigo
+          aberto={leitorAberto}
+          onOpenChange={setLeitorAberto}
+          onLeitura={(codigo) => void abrirPorCodigo(codigo)}
+        />
+      </ClientOnly>
+
+      {scan && (
+        <MovimentacaoDialog
+          material={scan}
+          tipo={tipoScan}
+          onTipoChange={setTipoScan}
+          aberto
+          onOpenChange={(v) => {
+            if (!v) setScan(null);
+          }}
+          onPronto={recarregar}
+        />
+      )}
+
+      <Dialog
+        open={!!codigoDesconhecido}
+        onOpenChange={(v) => {
+          if (!v) setCodigoDesconhecido(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Código não encontrado</DialogTitle>
+            <DialogDescription>
+              Nenhum material do armazém usa o código <strong>{codigoDesconhecido}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                setCadastroScan(true);
+              }}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Cadastrar material com este código
+            </Button>
+            <Button variant="outline" onClick={() => setCodigoDesconhecido(null)}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <NovoMaterial
+        onPronto={recarregar}
+        semGatilho
+        aberto={cadastroScan}
+        onOpenChange={(v) => {
+          setCadastroScan(v);
+          if (!v) setCodigoDesconhecido(null);
+        }}
+        codigoBarrasInicial={codigoDesconhecido ?? ""}
+        onCriado={async (codigoInterno) => {
+          setCadastroScan(false);
+          setCodigoDesconhecido(null);
+          await abrirPorCodigo(codigoInterno, "entrada");
+        }}
+      />
     </AppShell>
   );
 }
+
 
 function Indicador({
   icone,
@@ -245,8 +362,16 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
               {item.nome}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {[item.categoria || "Sem categoria", item.fornecedor || "Sem fornecedor"].join(" · ")}
+              {[
+                item.codigo_interno,
+                item.categoria || "Sem categoria",
+                item.fornecedor || "Sem fornecedor",
+                item.codigo_barras ? `EAN ${item.codigo_barras}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
+
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={item.abaixoDoMinimo ? "destructive" : "secondary"}>
@@ -290,6 +415,8 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
             }
           />
           <EditarMaterial item={item} onPronto={onPronto} />
+          <EtiquetaMaterial item={item} />
+
           <Button size="sm" variant="ghost" onClick={() => setAberto((v) => !v)}>
             {aberto ? "Ocultar" : `Movimentações (${item.movimentacoes.length})`}
           </Button>
@@ -364,6 +491,7 @@ type FormMaterial = {
   fornecedor: string;
   estoqueMinimo: string;
   observacoes: string;
+  codigoBarras: string;
 };
 
 const FORM_VAZIO: FormMaterial = {
@@ -374,7 +502,9 @@ const FORM_VAZIO: FormMaterial = {
   fornecedor: "",
   estoqueMinimo: "0",
   observacoes: "",
+  codigoBarras: "",
 };
+
 
 function numeroOuNulo(valor: string): number | null {
   const limpo = valor.replace(",", ".").trim();
@@ -452,6 +582,16 @@ function CamposMaterial({
         />
       </div>
       <div className="space-y-1.5 sm:col-span-2">
+        <Label>Código de barras do fabricante (opcional)</Label>
+        <Input
+          value={form.codigoBarras}
+          onChange={(e) => setForm({ ...form, codigoBarras: e.target.value })}
+          placeholder="7891234567895"
+          inputMode="text"
+          autoComplete="off"
+        />
+      </div>
+      <div className="space-y-1.5 sm:col-span-2">
         <Label>Observações</Label>
         <Textarea
           value={form.observacoes}
@@ -463,8 +603,29 @@ function CamposMaterial({
   );
 }
 
-function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
-  const [aberto, setAberto] = useState(false);
+function NovoMaterial({
+  onPronto,
+  semGatilho,
+  aberto: abertoProp,
+  onOpenChange,
+  codigoBarrasInicial = "",
+  onCriado,
+}: {
+  onPronto: () => Promise<void>;
+  semGatilho?: boolean;
+  aberto?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  codigoBarrasInicial?: string;
+  onCriado?: (codigoInterno: string) => Promise<void> | void;
+}) {
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const controlado = abertoProp !== undefined;
+  const aberto = controlado ? abertoProp : abertoLocal;
+  const definirAberto = (v: boolean) => {
+    if (controlado) onOpenChange?.(v);
+    else setAbertoLocal(v);
+    if (v) setForm({ ...FORM_VAZIO, codigoBarras: codigoBarrasInicial });
+  };
   const [form, setForm] = useState<FormMaterial>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
   const criarFn = useServerFn(criarMaterial);
@@ -472,9 +633,8 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   async function salvar() {
     setSalvando(true);
     try {
-      await criarFn({
+      const resposta = await criarFn({
         data: {
-          
           nome: form.nome,
           categoria: form.categoria,
           unidadeMedida: form.unidadeMedida,
@@ -482,12 +642,16 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
           fornecedor: form.fornecedor,
           estoqueMinimo: numeroOuNulo(form.estoqueMinimo) ?? 0,
           observacoes: form.observacoes,
+          codigoBarras: form.codigoBarras,
         },
       });
-      toast.success("Material cadastrado.");
+      toast.success(`Material cadastrado (${resposta.material?.codigo_interno ?? "novo código"}).`);
       setForm(FORM_VAZIO);
-      setAberto(false);
+      definirAberto(false);
       await onPronto();
+      if (onCriado && resposta.material?.codigo_interno) {
+        await onCriado(resposta.material.codigo_interno);
+      }
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não foi possível cadastrar.");
     } finally {
@@ -496,16 +660,20 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-1 h-4 w-4" /> Novo material
-        </Button>
-      </DialogTrigger>
+    <Dialog open={aberto} onOpenChange={definirAberto}>
+      {!semGatilho && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="mr-1 h-4 w-4" /> Novo material
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Novo material</DialogTitle>
-          <DialogDescription>Cadastre o item no armazém geral.</DialogDescription>
+          <DialogDescription>
+            Cadastre o item no armazém geral. O código da etiqueta QR é gerado automaticamente.
+          </DialogDescription>
         </DialogHeader>
         <CamposMaterial form={form} setForm={setForm} />
         <Button onClick={salvar} disabled={salvando || form.nome.trim().length < 2}>
@@ -515,6 +683,7 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
     </Dialog>
   );
 }
+
 
 function EditarMaterial({
   item,
@@ -533,6 +702,7 @@ function EditarMaterial({
     fornecedor: item.fornecedor,
     estoqueMinimo: String(item.estoque_minimo),
     observacoes: item.observacoes,
+    codigoBarras: item.codigo_barras,
   });
   const atualizarFn = useServerFn(atualizarMaterial);
 
@@ -549,8 +719,10 @@ function EditarMaterial({
           fornecedor: form.fornecedor,
           estoqueMinimo: numeroOuNulo(form.estoqueMinimo) ?? 0,
           observacoes: form.observacoes,
+          codigoBarras: form.codigoBarras,
         },
       });
+
       toast.success("Material atualizado.");
       setAberto(false);
       await onPronto();
@@ -587,16 +759,28 @@ function MovimentacaoDialog({
   tipo,
   gatilho,
   onPronto,
+  aberto: abertoProp,
+  onOpenChange,
+  onTipoChange,
 }: {
   material: MaterialComSaldo;
   tipo: "entrada" | "saida";
-  gatilho: React.ReactNode;
+  gatilho?: React.ReactNode;
   onPronto: () => Promise<void>;
+  aberto?: boolean;
+  onOpenChange?: (v: boolean) => void;
+  onTipoChange?: (t: "entrada" | "saida") => void;
 }) {
   const hoje = new Date().toISOString().slice(0, 10);
-  const [aberto, setAberto] = useState(false);
+  const [abertoLocal, setAbertoLocal] = useState(false);
+  const controlado = abertoProp !== undefined;
+  const aberto = controlado ? abertoProp : abertoLocal;
+  const definirAberto = (v: boolean) => {
+    if (controlado) onOpenChange?.(v);
+    else setAbertoLocal(v);
+  };
   const [salvando, setSalvando] = useState(false);
-  const [quantidade, setQuantidade] = useState("");
+  const [quantidade, setQuantidade] = useState(controlado ? "1" : "");
   const [custo, setCusto] = useState(
     tipo === "entrada" && material.custo_unitario !== null ? String(material.custo_unitario) : "",
   );
@@ -629,10 +813,10 @@ function MovimentacaoDialog({
         },
       });
       toast.success(tipo === "entrada" ? "Entrada registrada." : "Saída registrada.");
-      setQuantidade("");
+      setQuantidade(controlado ? "1" : "");
       setNotaFiscal("");
       setObservacoes("");
-      setAberto(false);
+      definirAberto(false);
       await onPronto();
     } catch (erro) {
       toast.error(erro instanceof Error ? erro.message : "Não foi possível registrar.");
@@ -642,19 +826,41 @@ function MovimentacaoDialog({
   }
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
-      <DialogTrigger asChild>{gatilho}</DialogTrigger>
+    <Dialog open={aberto} onOpenChange={definirAberto}>
+      {gatilho && <DialogTrigger asChild>{gatilho}</DialogTrigger>}
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {tipo === "entrada" ? "Entrada de material" : "Saída de material"}
           </DialogTitle>
           <DialogDescription>
-            {material.nome} · saldo atual {formatarQuantidade(material.saldo)}{" "}
-            {material.unidade_medida}
+            {material.nome} · {material.codigo_interno} · saldo atual{" "}
+            {formatarQuantidade(material.saldo)} {material.unidade_medida}
+            {material.abaixoDoMinimo ? " · abaixo do mínimo" : ""}
           </DialogDescription>
         </DialogHeader>
+        {onTipoChange && (
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              className="flex-1"
+              variant={tipo === "entrada" ? "default" : "outline"}
+              onClick={() => onTipoChange("entrada")}
+            >
+              <ArrowDownCircle className="mr-1 h-4 w-4" /> Entrada
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
+              variant={tipo === "saida" ? "default" : "outline"}
+              onClick={() => onTipoChange("saida")}
+            >
+              <ArrowUpCircle className="mr-1 h-4 w-4" /> Saída
+            </Button>
+          </div>
+        )}
         <div className="grid gap-3 sm:grid-cols-2">
+
           <div className="space-y-1.5">
             <Label>Quantidade ({material.unidade_medida})</Label>
             <Input

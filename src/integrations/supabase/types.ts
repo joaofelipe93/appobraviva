@@ -137,6 +137,8 @@ export type Database = {
       materiais: {
         Row: {
           categoria: string
+          codigo_barras: string | null
+          codigo_interno: string
           created_at: string
           custo_unitario: number | null
           estoque_minimo: number
@@ -149,6 +151,8 @@ export type Database = {
         }
         Insert: {
           categoria?: string
+          codigo_barras?: string | null
+          codigo_interno?: string
           created_at?: string
           custo_unitario?: number | null
           estoque_minimo?: number
@@ -161,6 +165,8 @@ export type Database = {
         }
         Update: {
           categoria?: string
+          codigo_barras?: string | null
+          codigo_interno?: string
           created_at?: string
           custo_unitario?: number | null
           estoque_minimo?: number
