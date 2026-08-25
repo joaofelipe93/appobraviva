@@ -85,8 +85,14 @@ export const Route = createFileRoute("/_authenticated/almoxarifado")({
 function AlmoxarifadoPage() {
   const acessoFn = useServerFn(acessoAlmoxarifado);
   const estoqueFn = useServerFn(listarEstoque);
+  const buscarCodigoFn = useServerFn(buscarMaterialPorCodigo);
   const queryClient = useQueryClient();
   const [busca, setBusca] = useState("");
+  const [leitorAberto, setLeitorAberto] = useState(false);
+  const [scan, setScan] = useState<MaterialComSaldo | null>(null);
+  const [tipoScan, setTipoScan] = useState<"entrada" | "saida">("saida");
+  const [codigoDesconhecido, setCodigoDesconhecido] = useState<string | null>(null);
+  const [cadastroScan, setCadastroScan] = useState(false);
 
   const acesso = useQuery({ queryKey: ["almoxarifado-acesso"], queryFn: () => acessoFn({}) });
 
@@ -96,16 +102,40 @@ function AlmoxarifadoPage() {
     enabled: !!acesso.data,
   });
 
-  async function recarregar() {
+  const recarregar = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: ["almoxarifado"] });
-  }
+  }, [queryClient]);
+
+  /** Consulta o código no banco e abre a movimentação do material correspondente. */
+  const abrirPorCodigo = useCallback(
+    async (codigo: string, tipo: "entrada" | "saida" = "saida") => {
+      try {
+        const resposta = await buscarCodigoFn({ data: { codigo } });
+        setLeitorAberto(false);
+        if (resposta.encontrado) {
+          setTipoScan(tipo);
+          setScan(resposta.material);
+          setCodigoDesconhecido(null);
+        } else {
+          setScan(null);
+          setCodigoDesconhecido(resposta.codigo || codigo);
+        }
+      } catch (erro) {
+        toast.error(erro instanceof Error ? erro.message : "Não foi possível buscar o código.");
+      }
+    },
+    [buscarCodigoFn],
+  );
 
   const itens = useMemo(() => {
     const lista = estoque.data?.itens ?? [];
     const termo = busca.trim().toLowerCase();
     if (!termo) return lista;
     return lista.filter((i) =>
-      [i.nome, i.categoria, i.fornecedor].join(" ").toLowerCase().includes(termo),
+      [i.nome, i.categoria, i.fornecedor, i.codigo_interno, i.codigo_barras]
+        .join(" ")
+        .toLowerCase()
+        .includes(termo),
     );
   }, [estoque.data, busca]);
 
@@ -134,17 +164,30 @@ function AlmoxarifadoPage() {
     <AppShell
       titulo="Almoxarifado"
       descricao="Armazém geral de materiais: entradas de compra e saídas de consumo em um único estoque."
-      acao={<NovoMaterial onPronto={recarregar} />}
+      acao={
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => setLeitorAberto(true)}>
+            <ScanLine className="mr-1 h-4 w-4" /> Ler código
+          </Button>
+          <NovoMaterial onPronto={recarregar} />
+        </div>
+      }
     >
       <div className="space-y-6">
-        <div className="space-y-1.5 sm:max-w-md">
-          <Label htmlFor="busca-material">Buscar material</Label>
-          <Input
-            id="busca-material"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Nome, categoria ou fornecedor"
-          />
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-md">
+            <Label htmlFor="busca-material">Buscar material</Label>
+            <Input
+              id="busca-material"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && busca.trim()) void abrirPorCodigo(busca.trim());
+              }}
+              placeholder="Nome, categoria, fornecedor ou código"
+            />
+          </div>
+          <ImprimirTodasEtiquetas itens={itens} />
         </div>
 
         {estoque.isLoading ? (
@@ -188,9 +231,75 @@ function AlmoxarifadoPage() {
           </>
         )}
       </div>
+
+      <ClientOnly fallback={null}>
+        <LeitorCodigo
+          aberto={leitorAberto}
+          onOpenChange={setLeitorAberto}
+          onLeitura={(codigo) => void abrirPorCodigo(codigo)}
+        />
+      </ClientOnly>
+
+      {scan && (
+        <MovimentacaoDialog
+          material={scan}
+          tipo={tipoScan}
+          onTipoChange={setTipoScan}
+          aberto
+          onOpenChange={(v) => {
+            if (!v) setScan(null);
+          }}
+          onPronto={recarregar}
+        />
+      )}
+
+      <Dialog
+        open={!!codigoDesconhecido}
+        onOpenChange={(v) => {
+          if (!v) setCodigoDesconhecido(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Código não encontrado</DialogTitle>
+            <DialogDescription>
+              Nenhum material do armazém usa o código <strong>{codigoDesconhecido}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => {
+                setCadastroScan(true);
+              }}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Cadastrar material com este código
+            </Button>
+            <Button variant="outline" onClick={() => setCodigoDesconhecido(null)}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <NovoMaterial
+        onPronto={recarregar}
+        semGatilho
+        aberto={cadastroScan}
+        onOpenChange={(v) => {
+          setCadastroScan(v);
+          if (!v) setCodigoDesconhecido(null);
+        }}
+        codigoBarrasInicial={codigoDesconhecido ?? ""}
+        onCriado={async (codigoInterno) => {
+          setCadastroScan(false);
+          setCodigoDesconhecido(null);
+          await abrirPorCodigo(codigoInterno, "entrada");
+        }}
+      />
     </AppShell>
   );
 }
+
 
 function Indicador({
   icone,
