@@ -474,7 +474,7 @@ function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
     try {
       await criarFn({
         data: {
-          obraId,
+          
           nome: form.nome,
           categoria: form.categoria,
           unidadeMedida: form.unidadeMedida,
