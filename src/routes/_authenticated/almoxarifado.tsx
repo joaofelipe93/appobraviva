@@ -362,8 +362,16 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
               {item.nome}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              {[item.categoria || "Sem categoria", item.fornecedor || "Sem fornecedor"].join(" · ")}
+              {[
+                item.codigo_interno,
+                item.categoria || "Sem categoria",
+                item.fornecedor || "Sem fornecedor",
+                item.codigo_barras ? `EAN ${item.codigo_barras}` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
             </p>
+
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={item.abaixoDoMinimo ? "destructive" : "secondary"}>
