@@ -463,7 +463,7 @@ function CamposMaterial({
   );
 }
 
-function NovoMaterial({ obraId, onPronto }: { obraId: string; onPronto: () => Promise<void> }) {
+function NovoMaterial({ onPronto }: { onPronto: () => Promise<void> }) {
   const [aberto, setAberto] = useState(false);
   const [form, setForm] = useState<FormMaterial>(FORM_VAZIO);
   const [salvando, setSalvando] = useState(false);
