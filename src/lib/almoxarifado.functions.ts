@@ -154,7 +154,8 @@ export const registrarMovimentacao = createServerFn({ method: "POST" })
       custo_unitario: data.custoUnitario,
       fornecedor: data.fornecedor,
       nota_fiscal: data.notaFiscal,
-      responsavel: data.responsavel,
+      // O responsável é sempre o usuário logado (não pode ser digitado).
+      responsavel: (await nomeDoUsuario(context)) || data.responsavel,
       observacoes: data.observacoes,
       data_movimento: data.dataMovimento,
       criado_por: context.userId,
