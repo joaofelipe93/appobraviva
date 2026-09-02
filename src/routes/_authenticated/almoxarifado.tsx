@@ -222,9 +222,19 @@ function AlmoxarifadoPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {itens.map((item) => (
-                  <MaterialCard key={item.id} item={item} onPronto={recarregar} />
+              <div className="space-y-8">
+                {grupos.map((grupo) => (
+                  <section key={grupo.categoria} className="space-y-3">
+                    <div className="flex items-center gap-3 border-b border-border pb-1.5">
+                      <h2 className="font-display text-sm uppercase tracking-widest text-muted-foreground">
+                        {grupo.categoria}
+                      </h2>
+                      <Badge variant="outline">{grupo.itens.length}</Badge>
+                    </div>
+                    {grupo.itens.map((item) => (
+                      <MaterialCard key={item.id} item={item} onPronto={recarregar} />
+                    ))}
+                  </section>
                 ))}
               </div>
             )}
