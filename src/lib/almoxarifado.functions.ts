@@ -9,7 +9,12 @@ import {
   normalizarCodigo,
 } from "./almoxarifado.schemas";
 import type { MaterialComSaldo } from "./almoxarifado.schemas";
-import { CAMPOS_MATERIAL, exigirEquipe, montarMaterial } from "./almoxarifado.server";
+import {
+  CAMPOS_MATERIAL,
+  exigirEquipe,
+  montarMaterial,
+  nomeDoUsuario,
+} from "./almoxarifado.server";
 
 const idSchema = z.object({ id: z.string().uuid() });
 
