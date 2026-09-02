@@ -893,12 +893,14 @@ function MovimentacaoDialog({
                 <Input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
               </div>
             </>
-          ) : (
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Responsável pela retirada</Label>
-              <Input value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
-            </div>
-          )}
+          ) : null}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Responsável</Label>
+            <Input value={responsavel} readOnly disabled />
+            <p className="text-xs text-muted-foreground">
+              Registrado automaticamente com o nome de quem está logado.
+            </p>
+          </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Observações</Label>
             <Textarea
