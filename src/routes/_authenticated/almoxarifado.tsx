@@ -786,7 +786,9 @@ function MovimentacaoDialog({
   );
   const [fornecedor, setFornecedor] = useState(tipo === "entrada" ? material.fornecedor : "");
   const [notaFiscal, setNotaFiscal] = useState("");
-  const [responsavel, setResponsavel] = useState("");
+  const acessoFn = useServerFn(acessoAlmoxarifado);
+  const acesso = useQuery({ queryKey: ["almoxarifado-acesso"], queryFn: () => acessoFn({}) });
+  const responsavel = acesso.data?.nome ?? "";
   const [observacoes, setObservacoes] = useState("");
   const [data, setData] = useState(hoje);
   const registrarFn = useServerFn(registrarMovimentacao);
