@@ -23,7 +23,8 @@ export const acessoAlmoxarifado = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const papel = await exigirEquipe(context);
-    return { papel };
+    const nome = await nomeDoUsuario(context);
+    return { papel, nome };
   });
 
 export const listarEstoque = createServerFn({ method: "GET" })
