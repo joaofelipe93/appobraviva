@@ -139,6 +139,24 @@ function AlmoxarifadoPage() {
     );
   }, [estoque.data, busca]);
 
+  /** Agrupa a lista por categoria informada no cadastro/planilha. */
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, MaterialComSaldo[]>();
+    for (const item of itens) {
+      const chave = item.categoria?.trim() || "Sem categoria";
+      const lista = mapa.get(chave);
+      if (lista) lista.push(item);
+      else mapa.set(chave, [item]);
+    }
+    return [...mapa.entries()]
+      .map(([categoria, lista]) => ({ categoria, itens: lista }))
+      .sort((a, b) => {
+        if (a.categoria === "Sem categoria") return 1;
+        if (b.categoria === "Sem categoria") return -1;
+        return a.categoria.localeCompare(b.categoria, "pt-BR");
+      });
+  }, [itens]);
+
   if (acesso.isLoading) {
     return (
       <AppShell titulo="Almoxarifado">
