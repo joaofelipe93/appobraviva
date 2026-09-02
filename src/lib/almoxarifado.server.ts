@@ -16,6 +16,16 @@ export async function exigirEquipe(context: { supabase: any; userId: string }) {
   return papel;
 }
 
+/** Nome do usuário logado, usado como responsável das movimentações. */
+export async function nomeDoUsuario(context: { supabase: any; userId: string }): Promise<string> {
+  const { data } = await context.supabase
+    .from("profiles")
+    .select("nome, email")
+    .eq("id", context.userId)
+    .maybeSingle();
+  return (data?.nome || data?.email || "").toString().slice(0, 120);
+}
+
 /** Converte a linha do banco (material + movimentações) no item com saldo usado na tela. */
 export function montarMaterial(m: any): MaterialComSaldo {
   const movimentacoes = ((m.movimentacoes_estoque ?? []) as MovimentacaoItem[])
