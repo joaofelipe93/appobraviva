@@ -52,13 +52,26 @@ function imprimirEtiquetas(itens: Etiqueta[], qrs: Record<string, string>) {
   janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" />
     <title>Etiquetas do almoxarifado</title>
     <style>
-      body { font-family: system-ui, sans-serif; margin: 16px; }
-      .grade { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-      .etiqueta { display: flex; gap: 10px; align-items: center; border: 1px solid #333; padding: 10px; border-radius: 4px; page-break-inside: avoid; }
-      .etiqueta img { width: 96px; height: 96px; }
-      .etiqueta div { display: flex; flex-direction: column; font-size: 12px; }
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; }
+      /* Grid não respeita quebra de página em vários navegadores: usamos blocos
+         inline para o QR nunca ser cortado entre uma folha e outra. */
+      .grade { font-size: 0; }
+      .etiqueta {
+        display: inline-flex; vertical-align: top; box-sizing: border-box;
+        width: calc(50% - 12px); margin: 0 6px 12px; height: 116px;
+        gap: 10px; align-items: center; border: 1px solid #333; padding: 10px;
+        border-radius: 4px; overflow: hidden;
+        page-break-inside: avoid; break-inside: avoid-page; -webkit-column-break-inside: avoid;
+      }
+      .etiqueta img { width: 96px; height: 96px; flex: none; }
+      .etiqueta div { display: flex; flex-direction: column; font-size: 12px; min-width: 0; }
+      .etiqueta span, .etiqueta strong { overflow-wrap: anywhere; }
       .etiqueta strong { font-size: 13px; text-transform: uppercase; }
-      @media print { @page { margin: 10mm; } }
+      @media print {
+        @page { margin: 10mm; }
+        body { padding: 0; }
+        .etiqueta { break-inside: avoid; page-break-inside: avoid; }
+      }
     </style></head><body><div class="grade">${cartoes}</div></body></html>`);
   janela.document.close();
   janela.focus();

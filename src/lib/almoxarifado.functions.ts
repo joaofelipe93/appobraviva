@@ -9,7 +9,12 @@ import {
   normalizarCodigo,
 } from "./almoxarifado.schemas";
 import type { MaterialComSaldo } from "./almoxarifado.schemas";
-import { CAMPOS_MATERIAL, exigirEquipe, montarMaterial } from "./almoxarifado.server";
+import {
+  CAMPOS_MATERIAL,
+  exigirEquipe,
+  montarMaterial,
+  nomeDoUsuario,
+} from "./almoxarifado.server";
 
 const idSchema = z.object({ id: z.string().uuid() });
 
@@ -18,7 +23,8 @@ export const acessoAlmoxarifado = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const papel = await exigirEquipe(context);
-    return { papel };
+    const nome = await nomeDoUsuario(context);
+    return { papel, nome };
   });
 
 export const listarEstoque = createServerFn({ method: "GET" })
@@ -148,7 +154,8 @@ export const registrarMovimentacao = createServerFn({ method: "POST" })
       custo_unitario: data.custoUnitario,
       fornecedor: data.fornecedor,
       nota_fiscal: data.notaFiscal,
-      responsavel: data.responsavel,
+      // O responsável é sempre o usuário logado (não pode ser digitado).
+      responsavel: (await nomeDoUsuario(context)) || data.responsavel,
       observacoes: data.observacoes,
       data_movimento: data.dataMovimento,
       criado_por: context.userId,

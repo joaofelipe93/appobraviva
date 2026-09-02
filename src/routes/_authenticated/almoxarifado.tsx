@@ -139,6 +139,24 @@ function AlmoxarifadoPage() {
     );
   }, [estoque.data, busca]);
 
+  /** Agrupa a lista por categoria informada no cadastro/planilha. */
+  const grupos = useMemo(() => {
+    const mapa = new Map<string, MaterialComSaldo[]>();
+    for (const item of itens) {
+      const chave = item.categoria?.trim() || "Sem categoria";
+      const lista = mapa.get(chave);
+      if (lista) lista.push(item);
+      else mapa.set(chave, [item]);
+    }
+    return [...mapa.entries()]
+      .map(([categoria, lista]) => ({ categoria, itens: lista }))
+      .sort((a, b) => {
+        if (a.categoria === "Sem categoria") return 1;
+        if (b.categoria === "Sem categoria") return -1;
+        return a.categoria.localeCompare(b.categoria, "pt-BR");
+      });
+  }, [itens]);
+
   if (acesso.isLoading) {
     return (
       <AppShell titulo="Almoxarifado">
@@ -222,9 +240,19 @@ function AlmoxarifadoPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {itens.map((item) => (
-                  <MaterialCard key={item.id} item={item} onPronto={recarregar} />
+              <div className="space-y-8">
+                {grupos.map((grupo) => (
+                  <section key={grupo.categoria} className="space-y-3">
+                    <div className="flex items-center gap-3 border-b border-border pb-1.5">
+                      <h2 className="font-display text-sm uppercase tracking-widest text-muted-foreground">
+                        {grupo.categoria}
+                      </h2>
+                      <Badge variant="outline">{grupo.itens.length}</Badge>
+                    </div>
+                    {grupo.itens.map((item) => (
+                      <MaterialCard key={item.id} item={item} onPronto={recarregar} />
+                    ))}
+                  </section>
                 ))}
               </div>
             )}
@@ -374,7 +402,13 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
 
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={item.abaixoDoMinimo ? "destructive" : "secondary"}>
+            <Badge
+              className={
+                item.saldo > 0
+                  ? "border-transparent bg-emerald-600 text-white"
+                  : "border-transparent bg-destructive text-destructive-foreground"
+              }
+            >
               Saldo {formatarQuantidade(item.saldo)} {item.unidade_medida}
             </Badge>
             {item.custo_unitario !== null && (
@@ -786,7 +820,9 @@ function MovimentacaoDialog({
   );
   const [fornecedor, setFornecedor] = useState(tipo === "entrada" ? material.fornecedor : "");
   const [notaFiscal, setNotaFiscal] = useState("");
-  const [responsavel, setResponsavel] = useState("");
+  const acessoFn = useServerFn(acessoAlmoxarifado);
+  const acesso = useQuery({ queryKey: ["almoxarifado-acesso"], queryFn: () => acessoFn({}) });
+  const responsavel = acesso.data?.nome ?? "";
   const [observacoes, setObservacoes] = useState("");
   const [data, setData] = useState(hoje);
   const registrarFn = useServerFn(registrarMovimentacao);
@@ -893,12 +929,14 @@ function MovimentacaoDialog({
                 <Input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} />
               </div>
             </>
-          ) : (
-            <div className="space-y-1.5 sm:col-span-2">
-              <Label>Responsável pela retirada</Label>
-              <Input value={responsavel} onChange={(e) => setResponsavel(e.target.value)} />
-            </div>
-          )}
+          ) : null}
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label>Responsável</Label>
+            <Input value={responsavel} readOnly disabled />
+            <p className="text-xs text-muted-foreground">
+              Registrado automaticamente com o nome de quem está logado.
+            </p>
+          </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label>Observações</Label>
             <Textarea
