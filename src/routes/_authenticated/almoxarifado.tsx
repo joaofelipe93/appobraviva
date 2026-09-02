@@ -374,7 +374,13 @@ function MaterialCard({ item, onPronto }: { item: MaterialComSaldo; onPronto: ()
 
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={item.abaixoDoMinimo ? "destructive" : "secondary"}>
+            <Badge
+              className={
+                item.saldo > 0
+                  ? "border-transparent bg-emerald-600 text-white"
+                  : "border-transparent bg-destructive text-destructive-foreground"
+              }
+            >
               Saldo {formatarQuantidade(item.saldo)} {item.unidade_medida}
             </Badge>
             {item.custo_unitario !== null && (
