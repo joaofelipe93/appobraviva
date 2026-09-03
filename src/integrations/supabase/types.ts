@@ -460,6 +460,136 @@ export type Database = {
         }
         Relationships: []
       }
+      suporte_anexos: {
+        Row: {
+          chamado_id: string
+          created_at: string
+          id: string
+          mensagem_id: string | null
+          path: string
+        }
+        Insert: {
+          chamado_id: string
+          created_at?: string
+          id?: string
+          mensagem_id?: string | null
+          path: string
+        }
+        Update: {
+          chamado_id?: string
+          created_at?: string
+          id?: string
+          mensagem_id?: string | null
+          path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suporte_anexos_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "suporte_chamados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "suporte_anexos_mensagem_id_fkey"
+            columns: ["mensagem_id"]
+            isOneToOne: false
+            referencedRelation: "suporte_mensagens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suporte_chamados: {
+        Row: {
+          assunto: string
+          cliente_id: string
+          created_at: string
+          descricao: string
+          fechado_em: string | null
+          fechado_por: string | null
+          id: string
+          obra_id: string | null
+          prioridade: Database["public"]["Enums"]["suporte_prioridade"]
+          status: Database["public"]["Enums"]["suporte_status"]
+          ultima_mensagem_em: string
+          unidade: string
+          updated_at: string
+        }
+        Insert: {
+          assunto: string
+          cliente_id: string
+          created_at?: string
+          descricao?: string
+          fechado_em?: string | null
+          fechado_por?: string | null
+          id?: string
+          obra_id?: string | null
+          prioridade?: Database["public"]["Enums"]["suporte_prioridade"]
+          status?: Database["public"]["Enums"]["suporte_status"]
+          ultima_mensagem_em?: string
+          unidade?: string
+          updated_at?: string
+        }
+        Update: {
+          assunto?: string
+          cliente_id?: string
+          created_at?: string
+          descricao?: string
+          fechado_em?: string | null
+          fechado_por?: string | null
+          id?: string
+          obra_id?: string | null
+          prioridade?: Database["public"]["Enums"]["suporte_prioridade"]
+          status?: Database["public"]["Enums"]["suporte_status"]
+          ultima_mensagem_em?: string
+          unidade?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suporte_chamados_obra_id_fkey"
+            columns: ["obra_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suporte_mensagens: {
+        Row: {
+          autor_id: string
+          autor_papel: Database["public"]["Enums"]["app_role"]
+          chamado_id: string
+          created_at: string
+          id: string
+          mensagem: string
+        }
+        Insert: {
+          autor_id: string
+          autor_papel: Database["public"]["Enums"]["app_role"]
+          chamado_id: string
+          created_at?: string
+          id?: string
+          mensagem: string
+        }
+        Update: {
+          autor_id?: string
+          autor_papel?: Database["public"]["Enums"]["app_role"]
+          chamado_id?: string
+          created_at?: string
+          id?: string
+          mensagem?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suporte_mensagens_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "suporte_chamados"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -490,6 +620,8 @@ export type Database = {
       etapa_status: "nao_iniciada" | "em_andamento" | "concluida"
       midia_tipo: "foto" | "video"
       movimentacao_tipo: "entrada" | "saida"
+      suporte_prioridade: "baixa" | "media" | "alta"
+      suporte_status: "aberto" | "em_atendimento" | "resolvido" | "fechado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -621,6 +753,8 @@ export const Constants = {
       etapa_status: ["nao_iniciada", "em_andamento", "concluida"],
       midia_tipo: ["foto", "video"],
       movimentacao_tipo: ["entrada", "saida"],
+      suporte_prioridade: ["baixa", "media", "alta"],
+      suporte_status: ["aberto", "em_atendimento", "resolvido", "fechado"],
     },
   },
 } as const

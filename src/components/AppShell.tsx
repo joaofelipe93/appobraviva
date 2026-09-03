@@ -1,8 +1,11 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { HardHat, LogOut } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { HardHat, LifeBuoy, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { meuPerfil } from "@/lib/obras.functions";
 import { Button } from "@/components/ui/button";
+
 import type { ReactNode } from "react";
 
 export function AppShell({
@@ -18,6 +21,9 @@ export function AppShell({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const perfilFn = useServerFn(meuPerfil);
+  const perfil = useQuery({ queryKey: ["perfil"], queryFn: () => perfilFn({}) });
+  const mostrarSuporte = perfil.data?.papel === "cliente" || perfil.data?.papel === "admin";
 
   async function sair() {
     await queryClient.cancelQueries();
@@ -38,14 +44,29 @@ export function AppShell({
               Obra<span className="text-accent">Viva</span>
             </span>
           </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={sair}
-            className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground"
-          >
-            <LogOut className="mr-1 h-4 w-4" /> Sair
-          </Button>
+          <div className="flex items-center gap-1">
+            {mostrarSuporte && (
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground"
+              >
+                <Link to="/suporte">
+                  <LifeBuoy className="mr-1 h-4 w-4" /> Suporte
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={sair}
+              className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground"
+            >
+              <LogOut className="mr-1 h-4 w-4" /> Sair
+            </Button>
+          </div>
+
         </div>
       </header>
 
