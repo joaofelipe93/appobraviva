@@ -30,7 +30,7 @@ import {
 import { STATUS, rotuloPrioridade, rotuloStatus } from "@/lib/suporte.schemas";
 import type { SuporteStatus } from "@/lib/suporte.schemas";
 
-export const Route = createFileRoute("/_authenticated/suporte/$id")({
+export const Route = createFileRoute("/_authenticated/suporte_/$id")({
   head: () => ({
     meta: [
       { title: "Chamado de suporte — ObraViva" },

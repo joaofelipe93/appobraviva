@@ -19,6 +19,7 @@ import { Route as AuthenticatedPainelRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedSuporteRouteImport } from './routes/_authenticated/suporte'
 import { Route as AuthenticatedAtualizacoesIdRouteImport } from './routes/_authenticated/atualizacoes.$id'
 import { Route as AuthenticatedObrasIdRouteImport } from './routes/_authenticated/obras.$id'
+import { Route as AuthenticatedSuporteIdRouteImport } from './routes/_authenticated/suporte.$id'
 import { Route as AuthenticatedObrasIdNovaAtualizacaoRouteImport } from './routes/_authenticated/obras_.$id.nova-atualizacao'
 import { Route as LovableEmailAuthPreviewRouteImport } from './routes/lovable/email/auth/preview'
 import { Route as LovableEmailAuthWebhookRouteImport } from './routes/lovable/email/auth/webhook'
@@ -74,6 +75,11 @@ const AuthenticatedObrasIdRoute = AuthenticatedObrasIdRouteImport.update({
   path: '/obras/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSuporteIdRoute = AuthenticatedSuporteIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AuthenticatedSuporteRoute,
+} as any)
 const AuthenticatedObrasIdNovaAtualizacaoRoute =
   AuthenticatedObrasIdNovaAtualizacaoRouteImport.update({
     id: '/obras_/$id/nova-atualizacao',
@@ -98,9 +104,10 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AuthenticatedAdminRoute
   '/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/painel': typeof AuthenticatedPainelRoute
-  '/suporte': typeof AuthenticatedSuporteRoute
+  '/suporte': typeof AuthenticatedSuporteRouteWithChildren
   '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/obras/$id': typeof AuthenticatedObrasIdRoute
+  '/suporte/$id': typeof AuthenticatedSuporteIdRoute
   '/obras/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -112,9 +119,10 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminRoute
   '/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/painel': typeof AuthenticatedPainelRoute
-  '/suporte': typeof AuthenticatedSuporteRoute
+  '/suporte': typeof AuthenticatedSuporteRouteWithChildren
   '/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/obras/$id': typeof AuthenticatedObrasIdRoute
+  '/suporte/$id': typeof AuthenticatedSuporteIdRoute
   '/obras/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -128,9 +136,10 @@ export interface FileRoutesById {
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/almoxarifado': typeof AuthenticatedAlmoxarifadoRoute
   '/_authenticated/painel': typeof AuthenticatedPainelRoute
-  '/_authenticated/suporte': typeof AuthenticatedSuporteRoute
+  '/_authenticated/suporte': typeof AuthenticatedSuporteRouteWithChildren
   '/_authenticated/atualizacoes/$id': typeof AuthenticatedAtualizacoesIdRoute
   '/_authenticated/obras/$id': typeof AuthenticatedObrasIdRoute
+  '/_authenticated/suporte/$id': typeof AuthenticatedSuporteIdRoute
   '/_authenticated/obras_/$id/nova-atualizacao': typeof AuthenticatedObrasIdNovaAtualizacaoRoute
   '/lovable/email/auth/preview': typeof LovableEmailAuthPreviewRoute
   '/lovable/email/auth/webhook': typeof LovableEmailAuthWebhookRoute
@@ -147,6 +156,7 @@ export interface FileRouteTypes {
     | '/suporte'
     | '/atualizacoes/$id'
     | '/obras/$id'
+    | '/suporte/$id'
     | '/obras/$id/nova-atualizacao'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -161,6 +171,7 @@ export interface FileRouteTypes {
     | '/suporte'
     | '/atualizacoes/$id'
     | '/obras/$id'
+    | '/suporte/$id'
     | '/obras/$id/nova-atualizacao'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -176,6 +187,7 @@ export interface FileRouteTypes {
     | '/_authenticated/suporte'
     | '/_authenticated/atualizacoes/$id'
     | '/_authenticated/obras/$id'
+    | '/_authenticated/suporte/$id'
     | '/_authenticated/obras_/$id/nova-atualizacao'
     | '/lovable/email/auth/preview'
     | '/lovable/email/auth/webhook'
@@ -262,6 +274,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedObrasIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/suporte/$id': {
+      id: '/_authenticated/suporte/$id'
+      path: '/$id'
+      fullPath: '/suporte/$id'
+      preLoaderRoute: typeof AuthenticatedSuporteIdRouteImport
+      parentRoute: typeof AuthenticatedSuporteRoute
+    }
     '/_authenticated/obras_/$id/nova-atualizacao': {
       id: '/_authenticated/obras_/$id/nova-atualizacao'
       path: '/obras/$id/nova-atualizacao'
@@ -286,11 +305,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedSuporteRouteChildren {
+  AuthenticatedSuporteIdRoute: typeof AuthenticatedSuporteIdRoute
+}
+
+const AuthenticatedSuporteRouteChildren: AuthenticatedSuporteRouteChildren = {
+  AuthenticatedSuporteIdRoute: AuthenticatedSuporteIdRoute,
+}
+
+const AuthenticatedSuporteRouteWithChildren =
+  AuthenticatedSuporteRoute._addFileChildren(AuthenticatedSuporteRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAlmoxarifadoRoute: typeof AuthenticatedAlmoxarifadoRoute
   AuthenticatedPainelRoute: typeof AuthenticatedPainelRoute
-  AuthenticatedSuporteRoute: typeof AuthenticatedSuporteRoute
+  AuthenticatedSuporteRoute: typeof AuthenticatedSuporteRouteWithChildren
   AuthenticatedAtualizacoesIdRoute: typeof AuthenticatedAtualizacoesIdRoute
   AuthenticatedObrasIdRoute: typeof AuthenticatedObrasIdRoute
   AuthenticatedObrasIdNovaAtualizacaoRoute: typeof AuthenticatedObrasIdNovaAtualizacaoRoute
@@ -300,7 +330,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAlmoxarifadoRoute: AuthenticatedAlmoxarifadoRoute,
   AuthenticatedPainelRoute: AuthenticatedPainelRoute,
-  AuthenticatedSuporteRoute: AuthenticatedSuporteRoute,
+  AuthenticatedSuporteRoute: AuthenticatedSuporteRouteWithChildren,
   AuthenticatedAtualizacoesIdRoute: AuthenticatedAtualizacoesIdRoute,
   AuthenticatedObrasIdRoute: AuthenticatedObrasIdRoute,
   AuthenticatedObrasIdNovaAtualizacaoRoute:
