@@ -1,8 +1,11 @@
 import { Link, useRouter } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
-import { HardHat, LogOut } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { HardHat, LifeBuoy, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { meuPerfil } from "@/lib/obras.functions";
 import { Button } from "@/components/ui/button";
+
 import type { ReactNode } from "react";
 
 export function AppShell({
